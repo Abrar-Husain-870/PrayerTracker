@@ -57,7 +57,7 @@ const Progress = () => {
     if (currentUser) {
       loadStats();
     }
-  }, [currentUser, selectedMonth, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser, timeframe, selectedMonth, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStats = async () => {
     try {
