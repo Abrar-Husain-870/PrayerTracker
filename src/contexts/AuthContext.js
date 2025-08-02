@@ -117,11 +117,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (user) {
         // Load nickname when user signs in
-        await getUserNickname(user.uid);
+        getUserNickname(user.uid);
       } else {
         setUserNickname('');
       }
@@ -129,6 +129,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     return unsubscribe;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = {
