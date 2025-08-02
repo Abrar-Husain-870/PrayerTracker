@@ -82,6 +82,7 @@ const PWAInstallPrompt = () => {
       window.removeEventListener('appinstalled', handleAppInstalled);
       clearTimeout(debugTimeout);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstallClick = async () => {
