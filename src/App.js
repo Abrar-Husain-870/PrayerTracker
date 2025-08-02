@@ -71,47 +71,47 @@ function AppContent() {
           <nav className="mt-3 sm:mt-4 flex gap-1 sm:gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setCurrentPage('calendar')}
-              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-base min-w-0 ${
                 currentPage === 'calendar'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Calendar</span>
+              <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium truncate">Calendar</span>
             </button>
             <button
               onClick={() => setCurrentPage('progress')}
-              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-base min-w-0 ${
                 currentPage === 'progress'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Progress</span>
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium truncate">Progress</span>
             </button>
             <button
               onClick={() => setCurrentPage('profile')}
-              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-base min-w-0 ${
                 currentPage === 'profile'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <User className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Profile</span>
+              <User className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium truncate">Profile</span>
             </button>
             <button
               onClick={() => setCurrentPage('leaderboard')}
-              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-base min-w-0 ${
                 currentPage === 'leaderboard'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Leaderboard</span>
+              <Trophy className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium truncate">Board</span>
             </button>
           </nav>
         </div>

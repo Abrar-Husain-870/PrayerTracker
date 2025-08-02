@@ -18,7 +18,8 @@ import {
   Zap,
   BarChart3,
   TrendingDown,
-  Minus
+  Minus,
+  X
 } from 'lucide-react';
 import { 
   collection, 
@@ -598,7 +599,7 @@ const Leaderboard = () => {
           );
           
           const validFriends = friendsWithScores
-            .filter(friend => friend && friend.totalDays > 0)
+            .filter(friend => friend !== null) // Only filter out null friends, keep all others
             .sort((a, b) => {
               // Primary: Composite Score
               if (b.compositeScore !== a.compositeScore) {
@@ -638,22 +639,62 @@ const Leaderboard = () => {
         const uniqueSentRequests = [...new Set(sentRequests)];
         const uniqueReceivedRequests = [...new Set(receivedRequests)];
         
-        // Update if we found duplicates
-        if (uniqueSentRequests.length !== sentRequests.length || uniqueReceivedRequests.length !== receivedRequests.length) {
+        // Validate that all sent/received request users actually exist
+        const validatedSentRequests = [];
+        const validatedReceivedRequests = [];
+        
+        // Check sent requests
+        for (const userId of uniqueSentRequests) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            if (userDoc.exists()) {
+              validatedSentRequests.push(userId);
+            } else {
+              console.log(`Removing orphaned sent request to deleted user: ${userId}`);
+            }
+          } catch (error) {
+            console.error(`Error validating sent request user ${userId}:`, error);
+          }
+        }
+        
+        // Check received requests
+        for (const userId of uniqueReceivedRequests) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            if (userDoc.exists()) {
+              validatedReceivedRequests.push(userId);
+            } else {
+              console.log(`Removing orphaned received request from deleted user: ${userId}`);
+            }
+          } catch (error) {
+            console.error(`Error validating received request user ${userId}:`, error);
+          }
+        }
+        
+        // Update if we found issues (duplicates or orphaned requests)
+        if (validatedSentRequests.length !== sentRequests.length || 
+            validatedReceivedRequests.length !== receivedRequests.length) {
           console.log('Cleaning up friend requests:', { 
             sentOriginal: sentRequests, 
-            sentCleaned: uniqueSentRequests,
+            sentAfterDedup: uniqueSentRequests,
+            sentAfterValidation: validatedSentRequests,
             receivedOriginal: receivedRequests,
-            receivedCleaned: uniqueReceivedRequests
+            receivedAfterDedup: uniqueReceivedRequests,
+            receivedAfterValidation: validatedReceivedRequests
           });
           await updateDoc(userDocRef, { 
-            friendRequestsSent: uniqueSentRequests,
-            friendRequestsReceived: uniqueReceivedRequests
+            friendRequestsSent: validatedSentRequests,
+            friendRequestsReceived: validatedReceivedRequests
           });
         }
         
-        setFriendRequestsSent(uniqueSentRequests);
-        setFriendRequestsReceived(uniqueReceivedRequests);
+        console.log('DEBUG: Setting friend requests state:', {
+          sentRequests: validatedSentRequests,
+          receivedRequests: validatedReceivedRequests
+        });
+        
+        setFriendRequestsSent(validatedSentRequests);
+        setFriendRequestsReceived(validatedReceivedRequests);
       }
     } catch (error) {
       console.error('Error fetching friend requests:', error);
@@ -776,17 +817,21 @@ const Leaderboard = () => {
       const requesterData = requesterDoc.data();
       const requesterNickname = requesterData.nickname;
       
-      // Update both users to be friends
+      // Update both users to be friends and clean up ALL mutual requests
       const currentUserDocRef = doc(db, 'users', currentUser.uid);
       
+      // Clean up the received request and any sent request to the same user
       await updateDoc(currentUserDocRef, {
         friends: arrayUnion(requesterNickname),
-        friendRequestsReceived: arrayRemove(requesterId)
+        friendRequestsReceived: arrayRemove(requesterId),
+        friendRequestsSent: arrayRemove(requesterId) // Remove any sent request to this user
       });
       
+      // Clean up the sent request and any received request from the same user
       await updateDoc(requesterDocRef, {
         friends: arrayUnion(currentUserNickname),
-        friendRequestsSent: arrayRemove(currentUser.uid)
+        friendRequestsSent: arrayRemove(currentUser.uid),
+        friendRequestsReceived: arrayRemove(currentUser.uid) // Remove any received request from this user
       });
       
       fetchUserFriends();
@@ -817,6 +862,32 @@ const Leaderboard = () => {
     } catch (error) {
       console.error('Error declining friend request:', error);
       showNotification('error', 'Failed to decline friend request. Please try again.');
+    }
+  };
+
+  const withdrawFriendRequest = async (userId) => {
+    try {
+      // Get the target user's data to show their nickname in the notification
+      const targetUserDoc = await getDoc(doc(db, 'users', userId));
+      const targetUserNickname = targetUserDoc.exists() ? targetUserDoc.data().nickname : 'user';
+      
+      // Remove request from both users
+      const currentUserDocRef = doc(db, 'users', currentUser.uid);
+      const targetUserDocRef = doc(db, 'users', userId);
+      
+      await updateDoc(currentUserDocRef, {
+        friendRequestsSent: arrayRemove(userId)
+      });
+      
+      await updateDoc(targetUserDocRef, {
+        friendRequestsReceived: arrayRemove(currentUser.uid)
+      });
+      
+      fetchFriendRequests();
+      showNotification('success', `Friend request to ${targetUserNickname} withdrawn`);
+    } catch (error) {
+      console.error('Error withdrawing friend request:', error);
+      showNotification('error', 'Failed to withdraw friend request. Please try again.');
     }
   };
 
@@ -999,29 +1070,33 @@ const Leaderboard = () => {
     if (!requesterData) return null;
 
     return (
-      <div className="flex items-center justify-between p-4 rounded-lg border bg-white border-gray-200">
-        <div className="flex items-center gap-3">
-          {getProfileIcon(requesterData.nickname)}
-          <div>
-            <h4 className="font-semibold text-gray-800">{requesterData.nickname}</h4>
-            <p className="text-sm text-gray-500">{requesterData.email}</p>
-            <p className="text-xs text-gray-400">Wants to be your friend</p>
+      <div className="p-3 sm:p-4 rounded-lg border bg-white border-gray-200">
+        {/* Mobile: Stack vertically, Desktop: Side by side */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {getProfileIcon(requesterData.nickname)}
+            <div className="min-w-0 flex-1">
+              <h4 className="font-semibold text-gray-800 truncate">{requesterData.nickname}</h4>
+              <p className="text-sm text-gray-500 truncate">{requesterData.email}</p>
+              <p className="text-xs text-gray-400">Wants to be your friend</p>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={() => acceptFriendRequest(requesterId)}
-            className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Accept
-          </button>
-          <button
-            onClick={() => declineFriendRequest(requesterId)}
-            className="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Decline
-          </button>
+          
+          {/* Mobile: Full width buttons, Desktop: Compact buttons */}
+          <div className="flex gap-2 sm:flex-shrink-0">
+            <button
+              onClick={() => acceptFriendRequest(requesterId)}
+              className="flex-1 sm:flex-none px-4 py-2 sm:px-3 sm:py-1 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Accept
+            </button>
+            <button
+              onClick={() => declineFriendRequest(requesterId)}
+              className="flex-1 sm:flex-none px-4 py-2 sm:px-3 sm:py-1 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Decline
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1065,20 +1140,36 @@ const Leaderboard = () => {
     if (!userData) return null;
 
     return (
-      <div className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 border-gray-200">
-        <div className="flex items-center gap-3">
-          {getProfileIcon(userData.nickname)}
-          <div>
-            <h4 className="font-semibold text-gray-800">{userData.nickname}</h4>
-            <p className="text-sm text-gray-500">{userData.email}</p>
-            <p className="text-xs text-gray-400">Request pending...</p>
+      <div className="p-3 sm:p-4 rounded-lg border bg-gray-50 border-gray-200">
+        {/* Mobile: Stack vertically, Desktop: Side by side */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {getProfileIcon(userData.nickname)}
+            <div className="min-w-0 flex-1">
+              <h4 className="font-semibold text-gray-800 truncate">{userData.nickname}</h4>
+              <p className="text-sm text-gray-500 truncate">{userData.email}</p>
+              <p className="text-xs text-gray-400">Request pending...</p>
+            </div>
           </div>
-        </div>
-        
-        <div className="text-right">
-          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-lg">
-            Pending
-          </span>
+          
+          {/* Mobile: Full width layout, Desktop: Compact layout */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3">
+            <div className="text-center sm:text-right">
+              <span className="px-4 py-2 sm:px-3 sm:py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-lg">
+                Pending
+              </span>
+            </div>
+            
+            <button
+              onClick={() => withdrawFriendRequest(userId)}
+              className="w-full sm:w-auto px-4 py-2 sm:px-3 sm:py-1 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-1"
+              title="Withdraw friend request"
+            >
+              <X className="w-3 h-3" />
+              <span className="sm:hidden">Withdraw Request</span>
+              <span className="hidden sm:inline">Withdraw</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1435,43 +1526,45 @@ const Leaderboard = () => {
                   {/* Friends List */}
                   <div className="space-y-3">
                     {friendsData.map((friend, index) => (
-                      <div key={friend.id} className="p-4 rounded-lg border bg-white border-gray-200 hover:bg-gray-50">
-                        {/* Main Row */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            {getRankIcon(index + 1)}
-                            {getProfileIcon(friend.nickname)}
-                            <div>
+                      <div key={friend.id} className="p-3 sm:p-4 rounded-lg border bg-white border-gray-200 hover:bg-gray-50">
+                        {/* Mobile: Stack vertically, Desktop: Side by side */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                            <div className="flex-shrink-0">{getRankIcon(index + 1)}</div>
+                            <div className="flex-shrink-0">{getProfileIcon(friend.nickname)}</div>
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-gray-800">{friend.nickname}</h3>
+                                <h3 className="font-semibold text-gray-800 truncate">{friend.nickname}</h3>
                                 {friend.trend && getTrendIcon(friend.trend)}
                               </div>
                               <p className="text-sm text-gray-500">{friend.totalDays} days tracked</p>
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-gray-800">
-                                {friend.compositeScore ? friend.compositeScore.toFixed(1) : friend.averageScore.toFixed(2)}
+                          {/* Mobile: Full width layout, Desktop: Compact layout */}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3">
+                            <div className="text-center sm:text-right">
+                              <p className="text-xl sm:text-2xl font-bold text-gray-800">
+                                {friend.compositeScore ? friend.compositeScore.toFixed(1) : (friend.averageScore || 0).toFixed(2)}
                               </p>
                               <p className="text-sm text-gray-500">
                                 {friend.compositeScore ? 'composite score' : 'avg score'}
                               </p>
                               {friend.compositeScore && (
                                 <p className="text-xs text-gray-400">
-                                  avg: {friend.averageScore.toFixed(1)}
+                                  avg: {(friend.averageScore || 0).toFixed(1)}
                                 </p>
                               )}
                             </div>
                             
                             <button
                               onClick={() => removeFriend(friend.nickname)}
-                              className="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+                              className="w-full sm:w-auto px-4 py-2 sm:px-3 sm:py-1 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-1"
                               title={`Remove ${friend.nickname} from friends`}
                             >
                               <UserPlus className="w-3 h-3 rotate-45" />
-                              Remove
+                              <span className="sm:hidden">Remove Friend</span>
+                              <span className="hidden sm:inline">Remove</span>
                             </button>
                           </div>
                         </div>
