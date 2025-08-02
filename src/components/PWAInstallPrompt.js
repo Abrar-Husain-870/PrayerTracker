@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
-import { injectDynamicManifest, checkPWAInstallability } from '../utils/pwaUtils';
 
 const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -8,84 +7,42 @@ const PWAInstallPrompt = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    console.log('PWA Install Prompt: Initializing...');
-    
     // Check if app is already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isInWebAppiOS = window.navigator.standalone === true;
     const isInWebAppChrome = window.matchMedia('(display-mode: standalone)').matches;
     
-    console.log('PWA Install Prompt: Install status check:', {
-      isStandalone,
-      isInWebAppiOS,
-      isInWebAppChrome,
-      userAgent: navigator.userAgent
-    });
-    
     if (isStandalone || isInWebAppiOS || isInWebAppChrome) {
-      console.log('PWA Install Prompt: App already installed');
       setIsInstalled(true);
       return;
     }
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e) => {
-      console.log('PWA Install Prompt: beforeinstallprompt event fired', e);
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
       // Stash the event so it can be triggered later
       setDeferredPrompt(e);
-      // Show the install prompt after a shorter delay for testing
+      // Show the install prompt after a delay
       setTimeout(() => {
-        console.log('PWA Install Prompt: Showing install prompt');
         setShowInstallPrompt(true);
-      }, 2000); // Show after 2 seconds for testing
+      }, 5000); // Show after 5 seconds
     };
 
     // Listen for app installed event
     const handleAppInstalled = () => {
-      console.log('PWA Install Prompt: App installed successfully');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
     };
 
-    // Debug: Check if service worker is registered
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
-        console.log('PWA Install Prompt: Service Worker ready', registration);
-      });
-    }
-
-    // Inject dynamic manifest to bypass Vercel static file issues
-    try {
-      const manifestUrl = injectDynamicManifest();
-      console.log('PWA Install Prompt: Dynamic manifest injected:', manifestUrl);
-    } catch (error) {
-      console.error('PWA Install Prompt: Dynamic manifest injection failed:', error);
-    }
-
-    // Check PWA installability
-    const installabilityCheck = checkPWAInstallability();
-    console.log('PWA Install Prompt: Installability check:', installabilityCheck);
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-
-    // Debug: Show a manual install button after 10 seconds if no prompt appears
-    const debugTimeout = setTimeout(() => {
-      if (!deferredPrompt && !isInstalled) {
-        console.log('PWA Install Prompt: No beforeinstallprompt event detected, showing debug info');
-        setShowInstallPrompt(true); // Show anyway for debugging
-      }
-    }, 10000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
-      clearTimeout(debugTimeout);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstallClick = async () => {
