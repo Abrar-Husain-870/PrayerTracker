@@ -5,7 +5,11 @@ import {
   Mail, 
   Calendar, 
   Trash2, 
-  AlertTriangle
+  AlertTriangle,
+  Edit2,
+  Save,
+  X,
+  Database
 } from 'lucide-react';
 import { 
   doc, 

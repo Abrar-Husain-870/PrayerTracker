@@ -126,14 +126,14 @@ export const calculatePrayerStats = (prayerData) => {
         stats.totalPrayers++;
         dayScore += PRAYER_SCORES[status];
         
-        if (status !== PRAYER_STATUS.NOT_PRAYED) {
-          dayPrayerCount++;
-        } else {
-          dayAllPrayersTracked = false;
-        }
+        // if (status !== PRAYER_STATUS.NOT_PRAYED) {
+        //   dayPrayerCount++; // Commented out - variable not used
+        // } else {
+        //   dayAllPrayersTracked = false; // Commented out - variable not used
+        // }
       } else {
         // Prayer is unmarked - don't count it in any statistics
-        dayAllPrayersTracked = false;
+        // dayAllPrayersTracked = false; // Commented out - variable not used
       }
     });
 

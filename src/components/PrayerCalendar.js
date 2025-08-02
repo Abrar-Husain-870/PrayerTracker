@@ -48,7 +48,7 @@ const PrayerCalendar = () => {
 
   const loadMonthData = async () => {
     try {
-      setLoading(true);
+      // setLoading(true); // Commented out - loading state not used
       
       // Get the first and last day of the current month
       const year = currentMonth.getFullYear();
@@ -99,7 +99,7 @@ const PrayerCalendar = () => {
     } catch (error) {
       console.error('Error loading month data:', error);
     } finally {
-      setLoading(false);
+      // setLoading(false); // Commented out - loading state not used
     }
   };
 

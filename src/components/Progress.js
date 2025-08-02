@@ -1,4 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
+import { Bar, Pie } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Calendar,
@@ -16,7 +27,11 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  Church,
+  X,
+  Zap,
+  Book
 } from 'lucide-react';
 import { 
   getMonthlyStats, 
@@ -25,6 +40,16 @@ import {
   getMotivationalInsights 
 } from '../services/analyticsService';
 import { PRAYER_STATUS, PRAYER_COLORS } from '../services/prayerService';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 const Progress = () => {
   const { currentUser } = useAuth();
