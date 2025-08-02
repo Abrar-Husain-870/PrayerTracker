@@ -12,6 +12,27 @@
   ],
   "routes": [
     {
+      "src": "/manifest.json",
+      "headers": {
+        "Content-Type": "application/json",
+        "cache-control": "s-maxage=86400"
+      }
+    },
+    {
+      "src": "/sw.js",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "cache-control": "s-maxage=0"
+      }
+    },
+    {
+      "src": "/android-chrome-(.*).png",
+      "headers": {
+        "Content-Type": "image/png",
+        "cache-control": "s-maxage=31536000,immutable"
+      }
+    },
+    {
       "src": "/static/(.*)",
       "headers": {
         "cache-control": "s-maxage=31536000,immutable"
