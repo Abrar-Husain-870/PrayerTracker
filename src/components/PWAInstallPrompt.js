@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
+import { injectDynamicManifest, checkPWAInstallability } from '../utils/pwaUtils';
 
 const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -56,15 +57,17 @@ const PWAInstallPrompt = () => {
       });
     }
 
-    // Debug: Check manifest
-    fetch('/manifest.json')
-      .then(response => response.json())
-      .then(manifest => {
-        console.log('PWA Install Prompt: Manifest loaded', manifest);
-      })
-      .catch(error => {
-        console.error('PWA Install Prompt: Manifest load error', error);
-      });
+    // Inject dynamic manifest to bypass Vercel static file issues
+    try {
+      const manifestUrl = injectDynamicManifest();
+      console.log('PWA Install Prompt: Dynamic manifest injected:', manifestUrl);
+    } catch (error) {
+      console.error('PWA Install Prompt: Dynamic manifest injection failed:', error);
+    }
+
+    // Check PWA installability
+    const installabilityCheck = checkPWAInstallability();
+    console.log('PWA Install Prompt: Installability check:', installabilityCheck);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
