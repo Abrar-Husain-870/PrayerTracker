@@ -2,15 +2,15 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// TODO: Replace with your Firebase config
+// Firebase configuration using environment variables (Vercel) with fallbacks (local dev)
 const firebaseConfig = {
-  apiKey: "AIzaSyD54H4pgkuXF2937WBPnKU1CkwgEBT0Zuk",
-  authDomain: "prayertracker-bad18.firebaseapp.com",
-  projectId: "prayertracker-bad18",
-  storageBucket: "prayertracker-bad18.firebasestorage.app",
-  messagingSenderId: "994167931425",
-  appId: "1:994167931425:web:dd25010d56997f4fd95960",
-  measurementId: "G-9LJSMEHN1G"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "AIzaSyD54H4pgkuXF2937WBPnKU1CkwgEBT0Zuk",
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "prayertracker-bad18.firebaseapp.com",
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "prayertracker-bad18",
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "prayertracker-bad18.firebasestorage.app",
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "994167931425",
+  appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:994167931425:web:dd25010d56997f4fd95960",
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-9LJSMEHN1G"
 };
 
 // Initialize Firebase
