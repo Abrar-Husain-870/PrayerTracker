@@ -5,31 +5,13 @@ import PrayerCalendar from './components/PrayerCalendar';
 import Progress from './components/Progress';
 import Profile from './components/Profile';
 import Leaderboard from './components/Leaderboard';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { LogOut, User, Calendar, TrendingUp, Trophy } from 'lucide-react';
 import './App.css';
 
 function AppContent() {
-  const { currentUser, logout, getUserNickname } = useAuth();
+  const { currentUser, logout, userNickname } = useAuth();
   const [currentPage, setCurrentPage] = useState('calendar');
-  const [userNickname, setUserNickname] = useState('');
-
-  // Fetch user nickname when currentUser changes
-  useEffect(() => {
-    const fetchUserNickname = async () => {
-      if (currentUser && getUserNickname) {
-        try {
-          const nickname = await getUserNickname(currentUser.uid);
-          setUserNickname(nickname);
-        } catch (error) {
-          console.error('Error fetching user nickname:', error);
-          // Fallback to display name or email
-          setUserNickname(currentUser.displayName || currentUser.email.split('@')[0]);
-        }
-      }
-    };
-
-    fetchUserNickname();
-  }, [currentUser, getUserNickname]);
 
   const handleLogout = async () => {
     try {
@@ -71,7 +53,7 @@ function AppContent() {
               <div>
                 <h1 className="font-semibold text-gray-900 text-sm sm:text-base">Jamā'ah Journal</h1>
                 <p className="text-xs text-gray-500 hidden sm:block">
-                  Welcome, {userNickname || 'User'}
+                  Welcome, {userNickname || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User'}
                 </p>
               </div>
             </div>
@@ -144,6 +126,9 @@ function AppContent() {
       <footer className="text-center py-4 text-sm text-gray-500">
         <p>Build your spiritual discipline, one prayer at a time</p>
       </footer>
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 }

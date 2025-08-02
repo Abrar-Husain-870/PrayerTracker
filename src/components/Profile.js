@@ -23,7 +23,7 @@ import { db } from '../firebase/config';
 import { getYearlyStats } from '../services/analyticsService';
 
 const Profile = () => {
-  const { currentUser, logout, getUserNickname } = useAuth();
+  const { currentUser, logout, getUserNickname, refreshNickname, userNickname: contextNickname } = useAuth();
   const [userNickname, setUserNickname] = useState('');
   const [editingNickname, setEditingNickname] = useState(false);
   const [newNickname, setNewNickname] = useState('');
@@ -39,7 +39,7 @@ const Profile = () => {
     const fetchUserData = async () => {
       if (currentUser) {
         try {
-          const nickname = await getUserNickname();
+          const nickname = contextNickname || await getUserNickname();
           setUserNickname(nickname || 'User');
           setNewNickname(nickname || '');
           
@@ -61,7 +61,7 @@ const Profile = () => {
     };
 
     fetchUserData();
-  }, [currentUser, getUserNickname]);
+  }, [currentUser, getUserNickname, contextNickname]);
 
   const handleNicknameEdit = () => {
     setEditingNickname(true);
@@ -80,6 +80,9 @@ const Profile = () => {
       
       setUserNickname(newNickname.trim());
       setEditingNickname(false);
+      
+      // Refresh nickname in AuthContext to update across the entire app
+      await refreshNickname();
     } catch (error) {
       console.error('Error updating nickname:', error);
       alert('Failed to update nickname. Please try again.');

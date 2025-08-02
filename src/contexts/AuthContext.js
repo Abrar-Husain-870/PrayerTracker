@@ -20,6 +20,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userNickname, setUserNickname] = useState('');
 
   const signup = async (email, password, nickname) => {
     try {
@@ -88,13 +89,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Get user's nickname from Firestore
-  const getUserNickname = async (userId) => {
+  const getUserNickname = async (userId = null) => {
     try {
-      const userDocRef = doc(db, 'users', userId);
+      const uid = userId || currentUser?.uid;
+      if (!uid) return 'User';
+      
+      const userDocRef = doc(db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
-        return userDoc.data().nickname || userDoc.data().displayName || 'User';
+        const nickname = userDoc.data().nickname || userDoc.data().displayName || 'User';
+        setUserNickname(nickname); // Update cached nickname
+        return nickname;
       }
       return 'User';
     } catch (error) {
@@ -102,10 +108,23 @@ export const AuthProvider = ({ children }) => {
       return 'User';
     }
   };
+  
+  // Refresh nickname from Firestore (call this after updating nickname)
+  const refreshNickname = async () => {
+    if (currentUser) {
+      await getUserNickname(currentUser.uid);
+    }
+  };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user) {
+        // Load nickname when user signs in
+        await getUserNickname(user.uid);
+      } else {
+        setUserNickname('');
+      }
       setLoading(false);
     });
 
@@ -114,11 +133,13 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     currentUser,
+    userNickname,
     signup,
     login,
     loginWithGoogle,
     logout,
-    getUserNickname
+    getUserNickname,
+    refreshNickname
   };
 
   return (

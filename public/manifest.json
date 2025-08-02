@@ -1,0 +1,28 @@
+{
+  "short_name": "Namaaz Tracker",
+  "name": "Jamā'ah Journal - Namaaz Tracker",
+  "description": "Track your daily Namaaz habits and build spiritual discipline with prayer tracking, progress analytics, and community features.",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#f8fafc",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["lifestyle", "productivity", "health"],
+  "lang": "en",
+  "dir": "ltr"
+}
