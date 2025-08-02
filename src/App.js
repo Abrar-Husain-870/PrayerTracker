@@ -111,7 +111,7 @@ function AppContent() {
               }`}
             >
               <Trophy className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium truncate">Board</span>
+              <span className="text-xs sm:text-sm font-medium truncate">Leaderboard</span>
             </button>
           </nav>
         </div>
