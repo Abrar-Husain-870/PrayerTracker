@@ -1,46 +1,66 @@
 {
-  "name": "namaaz-tracker",
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/manifest.json"
+    },
+    {
+      "source": "/sw.js",
+      "destination": "/sw.js"
+    },
+    {
+      "source": "/android-chrome-192x192.png",
+      "destination": "/android-chrome-192x192.png"
+    },
+    {
+      "source": "/android-chrome-512x512.png",
+      "destination": "/android-chrome-512x512.png"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/manifest.json",
-      "headers": {
-        "Content-Type": "application/json",
-        "cache-control": "s-maxage=86400"
-      }
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
     },
     {
-      "src": "/sw.js",
-      "headers": {
-        "Content-Type": "application/javascript",
-        "cache-control": "s-maxage=0"
-      }
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
     },
     {
-      "src": "/android-chrome-(.*).png",
-      "headers": {
-        "Content-Type": "image/png",
-        "cache-control": "s-maxage=31536000,immutable"
-      }
+      "source": "/android-chrome-192x192.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        }
+      ]
     },
     {
-      "src": "/static/(.*)",
-      "headers": {
-        "cache-control": "s-maxage=31536000,immutable"
-      }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/android-chrome-512x512.png",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/png"
+        }
+      ]
     }
   ]
 }
