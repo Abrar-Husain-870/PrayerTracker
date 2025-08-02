@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Calendar Styles */
+.react-calendar {
+  @apply w-full border-none bg-transparent;
+}
+
+.react-calendar__navigation {
+  @apply mb-4;
+}
+
+.react-calendar__navigation button {
+  @apply text-gray-700 hover:bg-primary-50 rounded-lg p-2 transition-colors;
+}
+
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus {
+  @apply bg-primary-100;
+}
+
+.react-calendar__month-view__weekdays {
+  @apply text-sm font-medium text-gray-600;
+}
+
+.react-calendar__month-view__weekdays__weekday {
+  @apply p-2 text-center;
+}
+
+.react-calendar__tile {
+  @apply p-2 text-center hover:bg-primary-50 rounded-lg transition-colors relative;
+  min-height: 60px;
+}
+
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus {
+  @apply bg-primary-100;
+}
+
+.react-calendar__tile--now {
+  @apply bg-primary-600 text-white;
+}
+
+.react-calendar__tile--now:enabled:hover,
+.react-calendar__tile--now:enabled:focus {
+  @apply bg-primary-700;
+}
+
+.react-calendar__tile--active {
+  @apply bg-primary-500 text-white;
+}
+
+.react-calendar__tile--active:enabled:hover,
+.react-calendar__tile--active:enabled:focus {
+  @apply bg-primary-600;
+}
+
+/* Custom scrollbar for mobile */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
