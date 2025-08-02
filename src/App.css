@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom breakpoints for extra small screens */
+@media (min-width: 475px) {
+  .xs\:inline { display: inline; }
+  .xs\:block { display: block; }
+  .xs\:flex { display: flex; }
+  .xs\:hidden { display: none; }
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .mobile-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Custom Calendar Styles */
 .react-calendar {
   @apply w-full border-none bg-transparent;
@@ -30,7 +50,13 @@
 
 .react-calendar__tile {
   @apply p-2 text-center hover:bg-primary-50 rounded-lg transition-colors relative;
-  min-height: 60px;
+  min-height: 50px;
+}
+
+@media (min-width: 640px) {
+  .react-calendar__tile {
+    min-height: 60px;
+  }
 }
 
 .react-calendar__tile:enabled:hover,

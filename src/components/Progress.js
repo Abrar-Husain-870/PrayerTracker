@@ -209,44 +209,45 @@ const Progress = () => {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-3 sm:p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-primary-600"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Your Spiritual Journey</h1>
-            <p className="text-primary-100">Track your progress and celebrate your growth</p>
+            <h1 className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">Your Spiritual Journey</h1>
+            <p className="text-primary-100 text-sm sm:text-base">Track your progress and celebrate your growth</p>
           </div>
-          <TrendingUp className="w-12 h-12 text-primary-200" />
+          <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 text-primary-200" />
         </div>
 
         {/* Time Frame Selector */}
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
+          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto">
             {[
-              { key: 'recent', label: 'Last 30 Days' },
-              { key: 'month', label: 'Monthly' },
-              { key: 'year', label: 'Yearly' }
+              { key: 'recent', label: 'Last 30 Days', shortLabel: '30D' },
+              { key: 'month', label: 'Monthly', shortLabel: 'Month' },
+              { key: 'year', label: 'Yearly', shortLabel: 'Year' }
             ].map(option => (
               <button
                 key={option.key}
                 onClick={() => setTimeframe(option.key)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm flex-1 sm:flex-none ${
                   timeframe === option.key
                     ? 'bg-white text-primary-700'
                     : 'bg-primary-500 text-white hover:bg-primary-400'
                 }`}
               >
-                {option.label}
+                <span className="sm:hidden">{option.shortLabel}</span>
+                <span className="hidden sm:inline">{option.label}</span>
               </button>
             ))}
           </div>
@@ -301,106 +302,106 @@ const Progress = () => {
       {stats && (
         <>
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Days Tracked</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.totalTrackedDays}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Days Tracked</p>
+                  <p className="text-xl sm:text-3xl font-bold text-gray-900">{stats.totalTrackedDays}</p>
                 </div>
-                <Calendar className="w-8 h-8 text-blue-500" />
+                <Calendar className="w-5 h-5 sm:w-8 sm:h-8 text-blue-500" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Consistency</p>
-                  <p className="text-3xl font-bold text-green-600">{(stats.consistency || 0).toFixed(1)}%</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Consistency</p>
+                  <p className="text-xl sm:text-3xl font-bold text-green-600">{(stats.consistency || 0).toFixed(1)}%</p>
                 </div>
-                <Target className="w-8 h-8 text-green-500" />
+                <Target className="w-5 h-5 sm:w-8 sm:h-8 text-green-500" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Current Streak</p>
-                  <p className="text-3xl font-bold text-blue-600">{stats.currentStreak}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Current Streak</p>
+                  <p className="text-xl sm:text-3xl font-bold text-blue-600">{stats.currentStreak}</p>
                   <p className="text-xs text-gray-500">days</p>
                 </div>
-                <Zap className="w-8 h-8 text-blue-500" />
+                <Zap className="w-5 h-5 sm:w-8 sm:h-8 text-blue-500" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Best Streak</p>
-                  <p className="text-3xl font-bold text-orange-600">{stats.bestStreak}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Best Streak</p>
+                  <p className="text-xl sm:text-3xl font-bold text-orange-600">{stats.bestStreak}</p>
                   <p className="text-xs text-gray-500">days</p>
                 </div>
-                <Flame className="w-8 h-8 text-orange-500" />
+                <Flame className="w-5 h-5 sm:w-8 sm:h-8 text-orange-500" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 col-span-2 md:col-span-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">Average Score</p>
-                  <p className="text-3xl font-bold text-purple-600">{(stats.averageScore || 0).toFixed(2)}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Average Score</p>
+                  <p className="text-xl sm:text-3xl font-bold text-purple-600">{(stats.averageScore || 0).toFixed(2)}</p>
                 </div>
-                <Award className="w-8 h-8 text-purple-500" />
+                <Award className="w-5 h-5 sm:w-8 sm:h-8 text-purple-500" />
               </div>
             </div>
           </div>
 
           {/* Surah Al-Kahf Friday Tracking */}
           {stats.surahAlKahfStats.totalFridays > 0 && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Book className="w-6 h-6 text-purple-600" />
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-purple-200">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+                <Book className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                 Surah Al-Kahf (Friday Special)
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-600 text-sm font-medium">Total Fridays</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.surahAlKahfStats.totalFridays}</p>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Total Fridays</p>
+                      <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.surahAlKahfStats.totalFridays}</p>
                     </div>
-                    <Calendar className="w-6 h-6 text-purple-500" />
+                    <Calendar className="w-4 h-4 sm:w-6 sm:h-6 text-purple-500" />
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-600 text-sm font-medium">Recited</p>
-                      <p className="text-2xl font-bold text-green-600">{stats.surahAlKahfStats.recited}</p>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Recited</p>
+                      <p className="text-lg sm:text-2xl font-bold text-green-600">{stats.surahAlKahfStats.recited}</p>
                     </div>
-                    <Book className="w-6 h-6 text-green-500" />
+                    <Book className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-600 text-sm font-medium">Missed</p>
-                      <p className="text-2xl font-bold text-red-600">{stats.surahAlKahfStats.missed}</p>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Missed</p>
+                      <p className="text-lg sm:text-2xl font-bold text-red-600">{stats.surahAlKahfStats.missed}</p>
                     </div>
-                    <X className="w-6 h-6 text-red-500" />
+                    <X className="w-4 h-4 sm:w-6 sm:h-6 text-red-500" />
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-600 text-sm font-medium">Consistency</p>
-                      <p className="text-2xl font-bold text-purple-600">{stats.surahAlKahfStats.consistency.toFixed(1)}%</p>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Consistency</p>
+                      <p className="text-lg sm:text-2xl font-bold text-purple-600">{stats.surahAlKahfStats.consistency.toFixed(1)}%</p>
                     </div>
-                    <Target className="w-6 h-6 text-purple-500" />
+                    <Target className="w-4 h-4 sm:w-6 sm:h-6 text-purple-500" />
                   </div>
                 </div>
               </div>
@@ -491,9 +492,9 @@ const Progress = () => {
           </div>
 
           {/* Detailed Breakdown */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-800 mb-6">Detailed Statistics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 sm:mb-6">Detailed Statistics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {Object.entries(stats.prayerBreakdown).map(([status, count]) => {
                 const percentage = stats.totalPrayers > 0 ? (count / stats.totalPrayers * 100).toFixed(1) : 0;
                 return (

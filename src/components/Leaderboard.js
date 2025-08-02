@@ -1203,28 +1203,28 @@ const Leaderboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg border transition-all duration-300 ${
+        <div className={`fixed top-4 right-2 sm:right-4 left-2 sm:left-auto z-50 px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg border transition-all duration-300 text-sm sm:text-base ${
           notification.type === 'success' 
             ? 'bg-green-50 border-green-200 text-green-800' 
             : 'bg-red-50 border-red-200 text-red-800'
         }`}>
           <div className="flex items-center gap-2">
             {notification.type === 'success' ? (
-              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-green-500 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
               </div>
             ) : (
-              <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
-                <div className="w-3 h-0.5 bg-white rounded"></div>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 flex items-center justify-center">
+                <div className="w-2.5 h-0.5 sm:w-3 sm:h-0.5 bg-white rounded"></div>
               </div>
             )}
-            <span className="font-medium">{notification.message}</span>
+            <span className="font-medium flex-1">{notification.message}</span>
             <button 
               onClick={() => setNotification(null)}
-              className="ml-2 text-gray-400 hover:text-gray-600"
+              className="ml-2 text-gray-400 hover:text-gray-600 text-lg sm:text-xl"
             >
               ×
             </button>
@@ -1233,17 +1233,17 @@ const Leaderboard = () => {
       )}
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-6">
-        <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-          <Trophy className="w-6 h-6" />
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2">
+          <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
           Leaderboard
         </h1>
-        <p className="text-primary-100">See how you rank among the community</p>
+        <p className="text-primary-100 text-sm sm:text-base">See how you rank among the community</p>
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100">
+        <div className="flex flex-col gap-4 items-start justify-between">
           {/* Tab Selection */}
           <div className="flex gap-2">
             <button

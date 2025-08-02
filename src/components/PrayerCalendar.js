@@ -283,15 +283,15 @@ const PrayerCalendar = () => {
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4">
-        <h2 className="text-xl font-semibold text-center">Jamā’ah Journal</h2>
-        <p className="text-center text-primary-100 text-sm mt-1">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-3 sm:p-4">
+        <h2 className="text-lg sm:text-xl font-semibold text-center">Jamā'ah Journal</h2>
+        <p className="text-center text-primary-100 text-xs sm:text-sm mt-1">
           Track your spiritual journey
         </p>
       </div>
 
       {/* Calendar */}
-      <div className="p-4">
+      <div className="p-2 sm:p-4">
         <Calendar
           onChange={setSelectedDate}
           onActiveStartDateChange={({ activeStartDate }) => setCurrentMonth(activeStartDate)}
@@ -304,14 +304,14 @@ const PrayerCalendar = () => {
               {date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
           )}
-          prevLabel={<ChevronLeft className="w-5 h-5" />}
-          nextLabel={<ChevronRight className="w-5 h-5" />}
+          prevLabel={<ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />}
+          nextLabel={<ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />}
         />
       </div>
 
       {/* Selected Date Prayer Status */}
-      <div className="border-t bg-gray-50 p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">
+      <div className="border-t bg-gray-50 p-3 sm:p-4">
+        <h3 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">
           {selectedDate.toLocaleDateString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
