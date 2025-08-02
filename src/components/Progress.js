@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
@@ -17,17 +18,9 @@ import {
   Target,
   Flame,
   Award,
-  BarChart3,
-  PieChart,
   Clock,
   Star,
-  BookOpen,
   Home,
-  Building,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
   Church,
   X,
   Zap,
