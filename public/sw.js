@@ -1,12 +1,13 @@
 const CACHE_NAME = 'namaaz-tracker-v1';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.json',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png'
 ];
+
+// Additional resources to cache dynamically
+const RUNTIME_CACHE = 'namaaz-tracker-runtime-v1';
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
@@ -23,11 +24,38 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
+        if (response) {
+          return response;
+        }
+        
+        // Clone the request for caching
+        const fetchRequest = event.request.clone();
+        
+        return fetch(fetchRequest).then((response) => {
+          // Check if valid response
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          
+          // Clone response for caching
+          const responseToCache = response.clone();
+          
+          // Cache runtime resources
+          caches.open(RUNTIME_CACHE)
+            .then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          
+          return response;
+        });
       })
       .catch(() => {
         // If both cache and network fail, return offline page
