@@ -1219,22 +1219,6 @@ const Leaderboard = () => {
               </p>
             )}
           </div>
-          
-          {showAddButton && !isCurrentUser && (
-            <button
-              onClick={() => sendFriendRequest(user)}
-              className={`px-3 py-1 text-white text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                friendRequestsSent.includes(user.id) 
-                  ? 'bg-gray-500 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-              title={friendRequestsSent.includes(user.id) ? 'Request sent' : `Send friend request to ${user.nickname}`}
-              disabled={friendRequestsSent.includes(user.id)}
-            >
-              <UserPlus className="w-3 h-3" />
-              {friendRequestsSent.includes(user.id) ? 'Sent' : 'Request'}
-            </button>
-          )}
         </div>
       </div>
       
@@ -1284,6 +1268,63 @@ const Leaderboard = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Action Buttons Row - Show for all users except current user */}
+      {!isCurrentUser && (
+        <div className="flex justify-center mt-3 pt-3 border-t border-gray-100">
+          {userFriends.includes(user.nickname) ? (
+            // Already friends - show remove button
+            <button
+              onClick={() => removeFriend(user.nickname)}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+              title={`Remove ${user.nickname} from friends`}
+            >
+              <UserPlus className="w-3 h-3 rotate-45" />
+              Remove Friend
+            </button>
+          ) : friendRequestsSent.includes(user.id) ? (
+            // Request already sent - show withdraw button
+            <button
+              onClick={() => withdrawFriendRequest(user.id)}
+              className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors flex items-center gap-1"
+              title="Withdraw friend request"
+            >
+              <X className="w-3 h-3" />
+              Withdraw Request
+            </button>
+          ) : friendRequestsReceived.includes(user.id) ? (
+            // Received request from this user - show accept/decline
+            <div className="flex gap-2">
+              <button
+                onClick={() => acceptFriendRequest(user.id)}
+                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                title={`Accept friend request from ${user.nickname}`}
+              >
+                <UserPlus className="w-3 h-3" />
+                Accept
+              </button>
+              <button
+                onClick={() => declineFriendRequest(user.id)}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+                title={`Decline friend request from ${user.nickname}`}
+              >
+                <X className="w-3 h-3" />
+                Decline
+              </button>
+            </div>
+          ) : (
+            // No relationship - show add friend button
+            <button
+              onClick={() => sendFriendRequest(user)}
+              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+              title={`Send friend request to ${user.nickname}`}
+            >
+              <UserPlus className="w-3 h-3" />
+              Add Friend
+            </button>
+          )}
         </div>
       )}
     </div>

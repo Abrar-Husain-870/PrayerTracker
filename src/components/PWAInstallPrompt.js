@@ -12,34 +12,56 @@ const PWAInstallPrompt = () => {
     const isInWebAppiOS = window.navigator.standalone === true;
     const isInWebAppChrome = window.matchMedia('(display-mode: standalone)').matches;
     
+    console.log('PWA Install Check:', {
+      isStandalone,
+      isInWebAppiOS,
+      isInWebAppChrome,
+      userAgent: navigator.userAgent,
+      isSecure: window.location.protocol === 'https:' || window.location.hostname === 'localhost'
+    });
+    
     if (isStandalone || isInWebAppiOS || isInWebAppChrome) {
+      console.log('App is already installed');
       setIsInstalled(true);
       return;
     }
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e) => {
+      console.log('beforeinstallprompt event fired');
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
       // Stash the event so it can be triggered later
       setDeferredPrompt(e);
-      // Show the install prompt after a delay
+      // Show the install prompt after a shorter delay for testing
       setTimeout(() => {
+        console.log('Showing install prompt');
         setShowInstallPrompt(true);
-      }, 5000); // Show after 5 seconds
+      }, 3000); // Show after 3 seconds
     };
 
     // Listen for app installed event
     const handleAppInstalled = () => {
+      console.log('App installed successfully');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
     };
 
+    // For testing: show install prompt even without beforeinstallprompt event
+    // This helps on browsers that don't fully support PWA install prompts
+    const testTimer = setTimeout(() => {
+      if (!deferredPrompt && !isInstalled) {
+        console.log('No beforeinstallprompt event detected, showing manual install info');
+        setShowInstallPrompt(true);
+      }
+    }, 8000); // Show after 8 seconds if no event
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      clearTimeout(testTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -76,7 +98,7 @@ const PWAInstallPrompt = () => {
     return null;
   }
 
-  if (!showInstallPrompt || !deferredPrompt) {
+  if (!showInstallPrompt) {
     return null;
   }
 
@@ -94,22 +116,41 @@ const PWAInstallPrompt = () => {
               Get quick access to your prayer tracking with our app!
             </p>
             
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={handleInstallClick}
-                className="flex items-center gap-1 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors"
-              >
-                <Download className="w-3 h-3" />
-                Install
-              </button>
-              
-              <button
-                onClick={handleDismiss}
-                className="px-3 py-1.5 text-gray-600 text-xs font-medium hover:text-gray-800 transition-colors"
-              >
-                Not now
-              </button>
-            </div>
+            {deferredPrompt ? (
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={handleInstallClick}
+                  className="flex items-center gap-1 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors"
+                >
+                  <Download className="w-3 h-3" />
+                  Install
+                </button>
+                
+                <button
+                  onClick={handleDismiss}
+                  className="px-3 py-1.5 text-gray-600 text-xs font-medium hover:text-gray-800 transition-colors"
+                >
+                  Not now
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <p className="text-gray-600 text-xs mb-2">
+                  To install manually:
+                </p>
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p><strong>Chrome/Edge:</strong> Menu → "Install app" or look for ⊕ in address bar</p>
+                  <p><strong>Safari:</strong> Share → "Add to Home Screen"</p>
+                  <p><strong>Firefox:</strong> Menu → "Install" (if available)</p>
+                </div>
+                <button
+                  onClick={handleDismiss}
+                  className="mt-2 px-3 py-1.5 text-gray-600 text-xs font-medium hover:text-gray-800 transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
+            )}
           </div>
           
           <button
