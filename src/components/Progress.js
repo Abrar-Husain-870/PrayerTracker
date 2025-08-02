@@ -1,31 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-} from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
-import { 
-  Calendar, 
-  TrendingUp, 
-  Award, 
-  Target, 
-  Flame, 
-  Zap,
-  Church, 
-  Home, 
-  Clock, 
-  X,
-  ChevronDown,
-  Star,
-  Book
-} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  Calendar,
+  TrendingUp,
+  Target,
+  Flame,
+  Award,
+  BarChart3,
+  PieChart,
+  Clock,
+  Star,
+  BookOpen,
+  Home,
+  Building,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter
+} from 'lucide-react';
 import { 
   getMonthlyStats, 
   getYearlyStats, 
@@ -33,16 +25,6 @@ import {
   getMotivationalInsights 
 } from '../services/analyticsService';
 import { PRAYER_STATUS, PRAYER_COLORS } from '../services/prayerService';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-);
 
 const Progress = () => {
   const { currentUser } = useAuth();
@@ -57,7 +39,7 @@ const Progress = () => {
     if (currentUser) {
       loadStats();
     }
-  }, [currentUser, timeframe, selectedMonth, selectedYear]);
+  }, [currentUser, selectedMonth, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStats = async () => {
     try {

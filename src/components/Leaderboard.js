@@ -23,8 +23,6 @@ import {
   collection, 
   getDocs, 
   query, 
-  orderBy, 
-  limit, 
   doc, 
   getDoc, 
   updateDoc, 
@@ -52,7 +50,7 @@ const Leaderboard = () => {
   const searchInputRef = useRef(null);
   const [friendRequestsSent, setFriendRequestsSent] = useState([]);
   const [friendRequestsReceived, setFriendRequestsReceived] = useState([]);
-  const [showFriendRequests, setShowFriendRequests] = useState(false);
+  // const [showFriendRequests, setShowFriendRequests] = useState(false); // Unused for now
   const [notification, setNotification] = useState(null); // { type: 'success'|'error', message: 'text' }
 
   useEffect(() => {
@@ -61,7 +59,7 @@ const Leaderboard = () => {
       fetchUserFriends();
       fetchFriendRequests();
     }
-  }, [currentUser, timePeriod]);
+  }, [currentUser, timePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (showAddFriend && searchInputRef.current) {
@@ -154,7 +152,7 @@ const Leaderboard = () => {
   // Calculate theoretical maximum average for current time period
   const theoreticalMaxAverage = React.useMemo(() => {
     return calculateTheoreticalMaxAverage();
-  }, [timePeriod]); // Recalculate when timePeriod changes
+  }, [timePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bar Graph Component for Friends Comparison
   const FriendsMetricBarGraph = ({ friends, currentUser }) => {
@@ -701,24 +699,22 @@ const Leaderboard = () => {
     }
   };
 
-  const addFriendByUser = async (friendUser) => {
-    try {
-      // Add friend
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(userDocRef, {
-        friends: arrayUnion(friendUser.nickname)
-      });
-      
-      setAddFriendInput('');
-      setSearchResults([]);
-      fetchUserFriends(); // Refresh friends data
-      
-      alert(`Added ${friendUser.nickname} as a friend!`);
-    } catch (error) {
-      console.error('Error adding friend:', error);
-      alert('Failed to add friend. Please try again.');
-    }
-  };
+  // Unused function - commented out to fix ESLint warnings
+  // const addFriendByUser = async (friendUser) => {
+  //   try {
+  //     const userDocRef = doc(db, 'users', currentUser.uid);
+  //     await updateDoc(userDocRef, {
+  //       friends: arrayUnion(friendUser.nickname)
+  //     });
+  //     setAddFriendInput('');
+  //     setSearchResults([]);
+  //     fetchUserFriends();
+  //     alert(`Added ${friendUser.nickname} as a friend!`);
+  //   } catch (error) {
+  //     console.error('Error adding friend:', error);
+  //     alert('Failed to add friend. Please try again.');
+  //   }
+  // };
 
   const sendFriendRequest = async (userToAdd) => {
     try {

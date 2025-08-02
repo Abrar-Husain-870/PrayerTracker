@@ -5,16 +5,18 @@ import {
   Mail, 
   Calendar, 
   Trash2, 
-  AlertTriangle,
-  Edit2,
-  Save,
-  X,
-  Database
+  AlertTriangle
 } from 'lucide-react';
-import { doc, updateDoc, deleteDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { 
+  doc, 
+  updateDoc, 
+  collection, 
+  getDocs, 
+  writeBatch 
+} from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import { db } from '../firebase/config';
-import { getMonthlyStats, getYearlyStats } from '../services/analyticsService';
+import { getYearlyStats } from '../services/analyticsService';
 
 const Profile = () => {
   const { currentUser, logout, getUserNickname } = useAuth();

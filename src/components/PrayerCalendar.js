@@ -23,15 +23,15 @@ const PrayerCalendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthData, setMonthData] = useState({});
   const [selectedDayData, setSelectedDayData] = useState({});
-  const [showPrayerModal, setShowPrayerModal] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // const [showPrayerModal, setShowPrayerModal] = useState(false); // Unused for now
+  // const [loading, setLoading] = useState(false); // Unused for now
 
   // Load month data when month changes
   useEffect(() => {
     if (currentUser) {
       loadMonthData();
     }
-  }, [currentUser, currentMonth]);
+  }, [currentUser, currentMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load selected day data when date changes
   useEffect(() => {
@@ -44,7 +44,7 @@ const PrayerCalendar = () => {
       });
       loadDayData();
     }
-  }, [currentUser, selectedDate]);
+  }, [currentUser, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMonthData = async () => {
     try {
@@ -235,12 +235,12 @@ const PrayerCalendar = () => {
         }
 
         // Count prayers that are not "Not Prayed" for the counter
-        const completedPrayers = markedPrayers.filter(prayer => 
-          dayData[prayer] !== PRAYER_STATUS.NOT_PRAYED
-        ).length;
+        // const completedPrayers = markedPrayers.filter(prayer => 
+        //   dayData[prayer] !== PRAYER_STATUS.NOT_PRAYED
+        // ).length; // Unused for now
         
-        const totalActivities = isFridayDate ? 6 : 5; // 5 prayers + Surah Al-Kahf on Friday
-        const markedActivities = markedPrayers.length + (surahMarked ? 1 : 0);
+        // const totalActivities = isFridayDate ? 6 : 5; // 5 prayers + Surah Al-Kahf on Friday
+        // const markedActivities = markedPrayers.length + (surahMarked ? 1 : 0); // Unused for now
 
         return (
           <div className="flex flex-col items-center">

@@ -105,8 +105,8 @@ export const calculatePrayerStats = (prayerData) => {
     const [year, month, day] = date.split('-').map(Number);
     const dateObj = new Date(year, month - 1, day); // month is 0-indexed
     let dayScore = 0;
-    let dayPrayerCount = 0;
-    let dayAllPrayersTracked = true;
+    // let dayPrayerCount = 0; // Unused for now
+    // let dayAllPrayersTracked = true; // Unused for now
     
     console.log(`Analytics Debug - Processing date: ${date}, dateObj: ${dateObj}, isFriday: ${isFriday(dateObj)}`);
 
