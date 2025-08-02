@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import PrayerCalendar from './components/PrayerCalendar';
@@ -6,12 +6,30 @@ import Progress from './components/Progress';
 import Profile from './components/Profile';
 import Leaderboard from './components/Leaderboard';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import { injectDynamicManifest, checkPWAInstallability } from './utils/pwaUtils';
 import { LogOut, User, Calendar, TrendingUp, Trophy } from 'lucide-react';
 import './App.css';
 
 function AppContent() {
   const { currentUser, logout, userNickname } = useAuth();
   const [currentPage, setCurrentPage] = useState('calendar');
+
+  // Initialize PWA immediately when AppContent loads
+  useEffect(() => {
+    console.log('AppContent: Initializing PWA on startup');
+    
+    // Inject dynamic manifest to bypass Vercel static file issues
+    try {
+      const manifestUrl = injectDynamicManifest();
+      console.log('AppContent: Dynamic manifest injected:', manifestUrl);
+    } catch (error) {
+      console.error('AppContent: Dynamic manifest injection failed:', error);
+    }
+
+    // Check PWA installability
+    const installabilityCheck = checkPWAInstallability();
+    console.log('AppContent: PWA installability check:', installabilityCheck);
+  }, []);
 
   const handleLogout = async () => {
     try {
