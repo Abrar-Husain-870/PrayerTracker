@@ -12,6 +12,20 @@
   ],
   "routes": [
     {
+      "src": "/sw.js",
+      "headers": {
+        "content-type": "application/javascript",
+        "cache-control": "no-cache"
+      }
+    },
+    {
+      "src": "/manifest.json",
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "s-maxage=86400"
+      }
+    },
+    {
       "src": "/static/(.*)",
       "headers": {
         "cache-control": "s-maxage=31536000,immutable"
