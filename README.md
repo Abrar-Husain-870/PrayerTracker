@@ -1,6 +1,6 @@
 # Prayer Tracker 🕌
 
-A beautiful React web app to track your daily Namaaz (prayer) habits and build spiritual discipline.
+A beautiful React web app to track your daily prayer habits and build spiritual discipline.
 
 ## Features
 

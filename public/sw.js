@@ -1,8 +1,7 @@
 const CACHE_NAME = 'namaaz-tracker-v1';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
+  '/index.html',
   '/manifest.json',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png'
