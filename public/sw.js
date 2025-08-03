@@ -5,19 +5,45 @@ const urlsToCache = [
   '/static/css/main.css',
   '/manifest.json',
   '/android-chrome-192x192.png',
-  '/android-chrome-512x512.png'
+  '/android-chrome-512x512.png',
+  '/favicon.ico'
 ];
 
-// Install event - cache resources
+// Install event - cache resources and skip waiting
 self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
+        console.log('Service Worker: Caching app shell');
         return cache.addAll(urlsToCache);
       })
-      .catch((error) => {
-        console.log('Cache install failed:', error);
+      .then(() => {
+        console.log('Service Worker: Cache complete');
+        return self.skipWaiting();
       })
+      .catch((error) => {
+        console.error('Service Worker: Cache install failed:', error);
+      })
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Service Worker: Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('Service Worker: Claiming clients');
+      return self.clients.claim();
+    })
   );
 });
 
