@@ -28,13 +28,16 @@ const PWAInstallPrompt = () => {
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e) => {
-      console.log('beforeinstallprompt event fired - PWA is installable!');
+      console.log('beforeinstallprompt event fired');
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
       // Stash the event so it can be triggered later
       setDeferredPrompt(e);
-      // Show the install prompt immediately when PWA criteria are met
-      setShowInstallPrompt(true);
+      // Show the install prompt after a shorter delay for testing
+      setTimeout(() => {
+        console.log('Showing install prompt');
+        setShowInstallPrompt(true);
+      }, 3000); // Show after 3 seconds
     };
 
     // Listen for app installed event
@@ -45,30 +48,20 @@ const PWAInstallPrompt = () => {
       setDeferredPrompt(null);
     };
 
-    // Force check for PWA installability
-    const checkInstallability = () => {
-      // Check if the browser supports PWA installation
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        console.log('Browser supports PWA features');
-        
-        // For browsers that don't fire beforeinstallprompt immediately
-        setTimeout(() => {
-          if (!deferredPrompt && !isInstalled) {
-            console.log('Checking if PWA criteria are met...');
-            // Show install prompt anyway - some browsers need user interaction first
-            setShowInstallPrompt(true);
-          }
-        }, 2000);
+    // For testing: show install prompt even without beforeinstallprompt event
+    // This helps on browsers that don't fully support PWA install prompts
+    const testTimer = setTimeout(() => {
+      if (!deferredPrompt && !isInstalled) {
+        console.log('No beforeinstallprompt event detected, showing manual install info');
+        setShowInstallPrompt(true);
       }
-    };
+    }, 8000); // Show after 8 seconds if no event
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-    
-    // Check installability after a short delay
-    setTimeout(checkInstallability, 1000);
 
     return () => {
+      clearTimeout(testTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -76,47 +69,23 @@ const PWAInstallPrompt = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      console.log('Triggering native install prompt');
-      try {
-        // Show the install prompt
-        const promptResult = await deferredPrompt.prompt();
-        console.log('Install prompt shown:', promptResult);
-        
-        // Wait for the user to respond to the prompt
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
-        
-        // Clear the prompt
-        setDeferredPrompt(null);
-        
-        if (outcome === 'accepted') {
-          console.log('User accepted the install prompt');
-          setShowInstallPrompt(false);
-        } else {
-          console.log('User dismissed the install prompt');
-          // Keep showing the prompt for retry
-        }
-      } catch (error) {
-        console.error('Error showing install prompt:', error);
-      }
+    if (!deferredPrompt) return;
+
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
     } else {
-      console.log('No deferred prompt available - trying alternative methods');
-      
-      // Try to trigger browser's native install if available
-      if (window.chrome && window.chrome.webstore) {
-        console.log('Chrome detected - user should see install option in menu');
-      }
-      
-      // For browsers without beforeinstallprompt, show enhanced instructions
-      alert('To install this app:\n\n' +
-            '📱 On Mobile:\n' +
-            '• Chrome: Menu (⋮) → "Add to Home screen"\n' +
-            '• Safari: Share → "Add to Home Screen"\n\n' +
-            '💻 On Desktop:\n' +
-            '• Look for install icon (⊕) in address bar\n' +
-            '• Or Menu → "Install app"');
+      console.log('User dismissed the install prompt');
     }
+    
+    // Clear the deferredPrompt
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
   };
 
   const handleDismiss = () => {
