@@ -32,6 +32,20 @@
       }
     },
     {
+      "src": "/android-chrome-192x192.png",
+      "headers": {
+        "content-type": "image/png",
+        "cache-control": "s-maxage=86400"
+      }
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "headers": {
+        "content-type": "image/png",
+        "cache-control": "s-maxage=86400"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
