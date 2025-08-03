@@ -92,10 +92,14 @@ const PWAInstallPrompt = () => {
     setShowInstallPrompt(false);
     // Don't show again for this session
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
+    // Increment install prompt count in localStorage
+    const count = Number(localStorage.getItem('pwa-install-prompt-count') || '0');
+    localStorage.setItem('pwa-install-prompt-count', String(count + 1));
   };
 
-  // Don't show if already installed or dismissed this session
-  if (isInstalled || sessionStorage.getItem('pwa-prompt-dismissed')) {
+  // Limit install popup to first three logins (per browser)
+  const installPromptCount = Number(localStorage.getItem('pwa-install-prompt-count') || '0');
+  if (isInstalled || sessionStorage.getItem('pwa-prompt-dismissed') || installPromptCount >= 3) {
     return null;
   }
 
@@ -112,7 +116,7 @@ const PWAInstallPrompt = () => {
           </div>
           
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 text-sm">Install Namaaz Tracker</h3>
+            <h3 className="font-semibold text-gray-900 text-sm">Install Jamā’ah Journal</h3>
             <p className="text-gray-600 text-xs mt-1">
               Get quick access to your prayer tracking with our app!
             </p>
