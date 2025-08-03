@@ -462,6 +462,7 @@ const Leaderboard = () => {
             id: userId,
             nickname: userData.nickname || 'Anonymous',
             email: userData.email,
+            isPrivate: userData.isPrivate || false,
             averageScore: stats.averageScore,
             totalDays: stats.totalDays,
             totalScore: stats.totalScore,
@@ -495,15 +496,18 @@ const Leaderboard = () => {
           return b.totalDays - a.totalDays;
         });
 
-      // Find current user's rank
+      // Filter out private users for global leaderboard display
+      const publicUsers = sortedUsers.filter(user => !user.isPrivate);
+
+      // Find current user's rank (in the full sorted list, including private users)
       const currentUserIndex = sortedUsers.findIndex(user => user.id === currentUser.uid);
       const currentUserData = sortedUsers[currentUserIndex];
       
       setCurrentUserStats(currentUserData);
       setCurrentUserRank(currentUserIndex >= 0 ? currentUserIndex + 1 : null);
       
-      // Take top 100 for global leaderboard
-      setLeaderboardData(sortedUsers.slice(0, 100));
+      // Take top 100 for global leaderboard (only public users)
+      setLeaderboardData(publicUsers.slice(0, 100));
       
     } catch (error) {
       console.error('Error fetching leaderboard data:', error);
@@ -1377,39 +1381,42 @@ const Leaderboard = () => {
       <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100">
         <div className="flex flex-col gap-4 items-start justify-between">
           {/* Tab Selection */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2 w-full">
             <button
               onClick={() => setActiveTab('global')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'global'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Globe className="w-4 h-4" />
-              Global
+              <Globe className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Global</span>
+              <span className="sm:hidden truncate">Global</span>
             </button>
             <button
               onClick={() => setActiveTab('friends')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'friends'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Users className="w-4 h-4" />
-              Friends ({userFriends.length})
+              <Users className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Friends ({userFriends.length})</span>
+              <span className="sm:hidden truncate">Friends ({userFriends.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('requests')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors relative ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors relative text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'requests'
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Star className="w-4 h-4" />
-              Requests
+              <Star className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Requests</span>
+              <span className="sm:hidden truncate">Requests</span>
               {friendRequestsReceived.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {friendRequestsReceived.length}

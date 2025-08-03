@@ -9,14 +9,18 @@ import {
   Edit2,
   Save,
   X,
-  Database
+  Database,
+  Shield,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   doc, 
   updateDoc, 
   collection, 
   getDocs, 
-  writeBatch 
+  writeBatch,
+  getDoc 
 } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import { db } from '../firebase/config';
@@ -34,6 +38,7 @@ const Profile = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
+  const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -42,6 +47,14 @@ const Profile = () => {
           const nickname = contextNickname || await getUserNickname();
           setUserNickname(nickname || 'User');
           setNewNickname(nickname || '');
+          
+          // Get user document to check privacy setting
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setIsPrivacyEnabled(userData.isPrivate || false);
+          }
           
           // Calculate total days tracked
           const currentYear = new Date().getFullYear();
@@ -94,6 +107,29 @@ const Profile = () => {
   const handleNicknameCancel = () => {
     setEditingNickname(false);
     setNewNickname(userNickname);
+  };
+
+  const handlePrivacyToggle = async () => {
+    try {
+      setLoading(true);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const newPrivacyState = !isPrivacyEnabled;
+      
+      await updateDoc(userDocRef, {
+        isPrivate: newPrivacyState
+      });
+      
+      setIsPrivacyEnabled(newPrivacyState);
+      alert(newPrivacyState 
+        ? 'Privacy enabled: You are now hidden from global leaderboards' 
+        : 'Privacy disabled: You are now visible on global leaderboards'
+      );
+    } catch (error) {
+      console.error('Error updating privacy setting:', error);
+      alert('Failed to update privacy setting. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const clearUserData = async (type) => {
@@ -274,6 +310,49 @@ const Profile = () => {
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-gray-400" />
               <p className="text-lg text-gray-900">{totalDaysTracked} days</p>
+            </div>
+          </div>
+
+          {/* Privacy Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Global Leaderboard Privacy</label>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {isPrivacyEnabled ? 'Private Mode' : 'Public Mode'}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {isPrivacyEnabled 
+                      ? 'Hidden from global leaderboards (friends can still see you)' 
+                      : 'Visible on global leaderboards'
+                    }
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handlePrivacyToggle}
+                disabled={loading}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                  isPrivacyEnabled ? 'bg-primary-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`absolute h-4 w-4 rounded-full bg-white transition-all duration-200 ease-in-out ${
+                    isPrivacyEnabled 
+                      ? 'left-[0.875rem] md:left-6' 
+                      : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+              {isPrivacyEnabled ? (
+                <><EyeOff className="w-3 h-3" /> Your data is hidden from global leaderboards</>
+              ) : (
+                <><Eye className="w-3 h-3" /> Your data is visible on global leaderboards</>
+              )}
             </div>
           </div>
         </div>
