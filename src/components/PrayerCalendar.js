@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { 
   PRAYER_TYPES, 
   PRAYER_STATUS, 
@@ -23,8 +25,27 @@ const PrayerCalendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthData, setMonthData] = useState({});
   const [selectedDayData, setSelectedDayData] = useState({});
+  const [masjidMode, setMasjidMode] = useState(false);
   // const [showPrayerModal, setShowPrayerModal] = useState(false); // Unused for now
   // const [loading, setLoading] = useState(false); // Unused for now
+
+  // Fetch user's Masjid Mode setting
+  useEffect(() => {
+    const fetchMasjidMode = async () => {
+      if (currentUser) {
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            setMasjidMode(userDoc.data().masjidMode || false);
+          }
+        } catch (error) {
+          console.error('Error fetching masjid mode:', error);
+        }
+      }
+    };
+    fetchMasjidMode();
+  }, [currentUser]);
 
   // Load month data when month changes
   useEffect(() => {
@@ -362,8 +383,9 @@ const PrayerCalendar = () => {
                     <option value="">-- Select --</option>
                     <option value={PRAYER_STATUS.NOT_PRAYED}>Not Prayed</option>
                     <option value={PRAYER_STATUS.QAZA}>Qaza</option>
-                    <option value={PRAYER_STATUS.HOME}>Home</option>
-                    <option value={PRAYER_STATUS.MASJID}>Masjid</option>
+                    {!masjidMode && <option value={PRAYER_STATUS.HOME}>Home</option>}
+                    {!masjidMode && <option value={PRAYER_STATUS.MASJID}>Masjid</option>}
+                    {masjidMode && <option value={PRAYER_STATUS.HOME}>Prayed</option>}
                   </select>
                 </div>
               </div>
@@ -437,7 +459,7 @@ const PrayerCalendar = () => {
             <span className="font-medium text-gray-700">Daily Score:</span>
             <span className="font-bold text-primary-700">
               {(() => {
-                const dayScore = calculateDayScore(selectedDayData, selectedDate);
+                const dayScore = calculateDayScore(selectedDayData, selectedDate, masjidMode);
                 const maxScore = isFriday(selectedDate) ? 145 : 135; // 135 + 10 for Surah Al-Kahf on Friday
                 return dayScore !== null ? `${dayScore} / ${maxScore}` : 'Not tracked';
               })()}

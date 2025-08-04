@@ -40,6 +40,19 @@ export const PRAYER_SCORES = {
   [PRAYER_STATUS.MASJID]: 27
 };
 
+// Masjid Mode scoring (for users who primarily pray at home)
+export const MASJID_MODE_PRAYER_SCORES = {
+  [PRAYER_STATUS.NOT_PRAYED]: 0,
+  [PRAYER_STATUS.QAZA]: 13,
+  [PRAYER_STATUS.HOME]: 27,
+  [PRAYER_STATUS.MASJID]: 27 // Same as home since masjid option is hidden in this mode
+};
+
+// Get prayer scores based on user's Masjid Mode setting
+export const getPrayerScores = (masjidMode = false) => {
+  return masjidMode ? MASJID_MODE_PRAYER_SCORES : PRAYER_SCORES;
+};
+
 export const SURAH_SCORES = {
   [SURAH_STATUS.RECITED]: 10,
   [SURAH_STATUS.MISSED]: 0
@@ -154,7 +167,7 @@ export const isFriday = (date) => {
 };
 
 // Calculate daily score
-export const calculateDayScore = (dayData, date = null) => {
+export const calculateDayScore = (dayData, date = null, masjidMode = false) => {
   // If dayData is null (unmarked date), return null to indicate no score
   if (!dayData) {
     return null;
@@ -162,10 +175,11 @@ export const calculateDayScore = (dayData, date = null) => {
   
   let totalScore = 0;
   const prayers = Object.values(PRAYER_TYPES);
+  const prayerScores = getPrayerScores(masjidMode);
   
   prayers.forEach(prayer => {
     const status = dayData[prayer] || PRAYER_STATUS.NOT_PRAYED;
-    totalScore += PRAYER_SCORES[status];
+    totalScore += prayerScores[status];
   });
   
   // Add Surah Al-Kahf score if it's Friday and the status is set

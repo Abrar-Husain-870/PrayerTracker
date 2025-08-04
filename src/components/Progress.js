@@ -12,6 +12,8 @@ import {
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import {
   Calendar,
   TrendingUp,
@@ -52,12 +54,32 @@ const Progress = () => {
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [masjidMode, setMasjidMode] = useState(false);
+
+  // Fetch user's Masjid Mode setting
+  useEffect(() => {
+    const fetchMasjidMode = async () => {
+      if (currentUser) {
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            setMasjidMode(userDoc.data().masjidMode || false);
+          }
+        } catch (error) {
+          console.error('Error fetching masjid mode:', error);
+          setMasjidMode(false);
+        }
+      }
+    };
+    fetchMasjidMode();
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
       loadStats();
     }
-  }, [currentUser, timeframe, selectedMonth, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser, timeframe, selectedMonth, selectedYear, masjidMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStats = async () => {
     try {
@@ -66,16 +88,16 @@ const Progress = () => {
       
       switch (timeframe) {
         case 'month':
-          statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth);
+          statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth, masjidMode);
           break;
         case 'year':
-          statsData = await getYearlyStats(currentUser.uid, selectedYear);
+          statsData = await getYearlyStats(currentUser.uid, selectedYear, masjidMode);
           break;
         case 'recent':
-          statsData = await getRecentStats(currentUser.uid, 30);
+          statsData = await getRecentStats(currentUser.uid, 30, masjidMode);
           break;
         default:
-          statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth);
+          statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth, masjidMode);
       }
       
       console.log('Progress Debug - Loaded stats data:', statsData);

@@ -39,6 +39,7 @@ const Leaderboard = () => {
   const { currentUser, getUserNickname } = useAuth();
   const [activeTab, setActiveTab] = useState('global'); // 'global', 'friends', or 'requests'
   const [timePeriod, setTimePeriod] = useState('month'); // 'week', 'month', 'year', 'all'
+  const [masjidModeFilter, setMasjidModeFilter] = useState('all'); // 'all', 'on', 'off'
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [friendsData, setFriendsData] = useState([]);
   const [userFriends, setUserFriends] = useState([]);
@@ -61,7 +62,7 @@ const Leaderboard = () => {
       fetchUserFriends();
       fetchFriendRequests();
     }
-  }, [currentUser, timePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser, timePeriod, masjidModeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (showAddFriend && searchInputRef.current) {
@@ -322,6 +323,20 @@ const Leaderboard = () => {
   const calculateUserScore = async (userId, period) => {
     try {
       const currentDate = new Date();
+      
+      // Fetch user's Masjid Mode setting
+      let masjidMode = false;
+      try {
+        const userDocRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          masjidMode = userDoc.data().masjidMode || false;
+        }
+      } catch (error) {
+        console.error('Error fetching user masjid mode:', error);
+        // Default to false if error occurs
+      }
+      
       let stats = { 
         totalScore: 0, 
         totalDays: 0, 
@@ -342,14 +357,14 @@ const Leaderboard = () => {
         startDate.setDate(endDate.getDate() - 6);
         
         const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-        stats = calculatePrayerStats(prayerData);
+        stats = calculatePrayerStats(prayerData, masjidMode);
       } else if (period === 'month') {
         // Current month
-        const monthStats = await getMonthlyStats(userId, currentDate.getFullYear(), currentDate.getMonth() + 1);
+        const monthStats = await getMonthlyStats(userId, currentDate.getFullYear(), currentDate.getMonth() + 1, masjidMode);
         stats = monthStats;
       } else if (period === 'year') {
         // Current year
-        const yearStats = await getYearlyStats(userId, currentDate.getFullYear());
+        const yearStats = await getYearlyStats(userId, currentDate.getFullYear(), masjidMode);
         stats = yearStats;
       } else {
         // All time - calculate from last 2 years
@@ -366,7 +381,7 @@ const Leaderboard = () => {
         };
         
         for (let year = currentDate.getFullYear() - 1; year <= currentDate.getFullYear(); year++) {
-          const yearStats = await getYearlyStats(userId, year);
+          const yearStats = await getYearlyStats(userId, year, masjidMode);
           allTimeStats.totalScore += yearStats.totalScore;
           allTimeStats.totalDays += yearStats.totalDays;
           allTimeStats.totalPrayers += yearStats.totalPrayers;
@@ -400,11 +415,11 @@ const Leaderboard = () => {
           const prevStartDate = new Date();
           prevStartDate.setDate(prevStartDate.getDate() - 13);
           const prevPrayerData = await getPrayerDataInRange(userId, prevStartDate, prevEndDate);
-          previousStats = calculatePrayerStats(prevPrayerData);
+          previousStats = calculatePrayerStats(prevPrayerData, masjidMode);
         } else if (period === 'month') {
           const prevMonth = currentDate.getMonth() === 0 ? 12 : currentDate.getMonth();
           const prevYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
-          previousStats = await getMonthlyStats(userId, prevYear, prevMonth);
+          previousStats = await getMonthlyStats(userId, prevYear, prevMonth, masjidMode);
         }
         
         if (previousStats && previousStats.averageScore > 0) {
@@ -463,6 +478,7 @@ const Leaderboard = () => {
             nickname: userData.nickname || 'Anonymous',
             email: userData.email,
             isPrivate: userData.isPrivate || false,
+            masjidMode: userData.masjidMode || false,
             averageScore: stats.averageScore,
             totalDays: stats.totalDays,
             totalScore: stats.totalScore,
@@ -497,7 +513,15 @@ const Leaderboard = () => {
         });
 
       // Filter out private users for global leaderboard display
-      const publicUsers = sortedUsers.filter(user => !user.isPrivate);
+      let publicUsers = sortedUsers.filter(user => !user.isPrivate);
+      
+      // Apply Masjid Mode filter if specified
+      if (masjidModeFilter === 'on') {
+        publicUsers = publicUsers.filter(user => user.masjidMode === true);
+      } else if (masjidModeFilter === 'off') {
+        publicUsers = publicUsers.filter(user => user.masjidMode === false);
+      }
+      // If masjidModeFilter === 'all', show all public users (no additional filtering)
 
       // Find current user's rank (in the full sorted list, including private users)
       const currentUserIndex = sortedUsers.findIndex(user => user.id === currentUser.uid);
@@ -506,7 +530,7 @@ const Leaderboard = () => {
       setCurrentUserStats(currentUserData);
       setCurrentUserRank(currentUserIndex >= 0 ? currentUserIndex + 1 : null);
       
-      // Take top 100 for global leaderboard (only public users)
+      // Take top 100 for global leaderboard (filtered by privacy and masjid mode)
       setLeaderboardData(publicUsers.slice(0, 100));
       
     } catch (error) {
@@ -1425,19 +1449,38 @@ const Leaderboard = () => {
             </button>
           </div>
 
-          {/* Time Period Filter */}
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-500" />
-            <select
-              value={timePeriod}
-              onChange={(e) => setTimePeriod(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="year">This Year</option>
-              <option value="all">All Time</option>
-            </select>
+          {/* Filters Row */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            {/* Time Period Filter */}
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <select
+                value={timePeriod}
+                onChange={(e) => setTimePeriod(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="year">This Year</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+            
+            {/* Masjid Mode Filter - Only show for Global tab */}
+            {activeTab === 'global' && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Prayer Mode:</span>
+                <select
+                  value={masjidModeFilter}
+                  onChange={(e) => setMasjidModeFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">All Users</option>
+                  <option value="off">Standard Mode</option>
+                  <option value="on">Home Prayer Mode</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

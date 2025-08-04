@@ -5,8 +5,9 @@ import PrayerCalendar from './components/PrayerCalendar';
 import Progress from './components/Progress';
 import Profile from './components/Profile';
 import Leaderboard from './components/Leaderboard';
+import Rules from './components/Rules';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import { LogOut, User, Calendar, TrendingUp, Trophy } from 'lucide-react';
+import { LogOut, User, Calendar, TrendingUp, Trophy, BookOpen } from 'lucide-react';
 import './App.css';
 
 function AppContent() {
@@ -35,6 +36,8 @@ function AppContent() {
         return <Profile />;
       case 'leaderboard':
         return <Leaderboard />;
+      case 'rules':
+        return <Rules />;
       default:
         return <PrayerCalendar />;
     }
@@ -112,6 +115,17 @@ function AppContent() {
             >
               <Trophy className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="text-xs sm:text-sm font-medium truncate">Leaderboards</span>
+            </button>
+            <button
+              onClick={() => setCurrentPage('rules')}
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-base min-w-0 ${
+                currentPage === 'rules'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium truncate">Rules</span>
             </button>
           </nav>
         </div>

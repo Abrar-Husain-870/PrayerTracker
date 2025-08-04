@@ -49,9 +49,9 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
 };
 
 // Calculate prayer statistics for a given period
-export const calculatePrayerStats = (prayerData) => {
+export const calculatePrayerStats = (prayerData, masjidMode = false) => {
   const stats = {
-    totalDays: Object.keys(prayerData).length,
+    totalDays: 0, // Will be set to actual tracked days below
     daysTracked: 0,
     totalScore: 0,
     maxPossibleScore: 0,
@@ -87,10 +87,20 @@ export const calculatePrayerStats = (prayerData) => {
 
   const dates = Object.keys(prayerData).sort();
   stats.totalTrackedDays = dates.length;
+  
+  // Get appropriate prayer scores based on Masjid Mode
+  const prayerScores = masjidMode ? 
+    {
+      [PRAYER_STATUS.NOT_PRAYED]: 0,
+      [PRAYER_STATUS.QAZA]: 13,
+      [PRAYER_STATUS.HOME]: 27,
+      [PRAYER_STATUS.MASJID]: 27
+    } : PRAYER_SCORES;
 
   // Debug logging for Surah Al-Kahf
   console.log('Analytics Debug - Total dates in prayerData:', dates.length);
   console.log('Analytics Debug - Date range:', dates.length > 0 ? `${dates[0]} to ${dates[dates.length - 1]}` : 'No dates');
+  console.log('Analytics Debug - Using Masjid Mode:', masjidMode);
 
   if (dates.length === 0) return stats;
 
@@ -124,7 +134,7 @@ export const calculatePrayerStats = (prayerData) => {
         
         // Update totals
         stats.totalPrayers++;
-        dayScore += PRAYER_SCORES[status];
+        dayScore += prayerScores[status];
         
         // if (status !== PRAYER_STATUS.NOT_PRAYED) {
         //   dayPrayerCount++; // Commented out - variable not used
@@ -172,7 +182,9 @@ export const calculatePrayerStats = (prayerData) => {
     }
 
     stats.totalScore += dayScore;
-    stats.maxPossibleScore += PRAYER_SCORES[PRAYER_STATUS.MASJID] * 5;
+    // Use the highest possible score for the mode (27 points per prayer in both modes)
+    const maxDailyScore = masjidMode ? 27 : PRAYER_SCORES[PRAYER_STATUS.MASJID];
+    stats.maxPossibleScore += maxDailyScore * 5;
     
     // Add Surah Al-Kahf to max possible score for Fridays
     if (isFriday(dateObj)) {
@@ -213,7 +225,11 @@ export const calculatePrayerStats = (prayerData) => {
 
   stats.bestStreak = bestStreakCount;
   stats.currentStreak = lastDateHadAllPrayers ? currentStreakCount : 0;
-  // Calculate average score as: total daily scores / number of days with data
+  
+  // Set totalDays to actual days tracked (not all days in range)
+  stats.totalDays = dates.length;
+  
+  // Calculate average score as: total daily scores / number of days actually tracked
   stats.averageScore = stats.totalDays > 0 ? stats.totalScore / stats.totalDays : 0;
   stats.consistency = stats.totalPrayers > 0 ? ((stats.totalPrayers - stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED]) / stats.totalPrayers) * 100 : 0;
   
@@ -238,31 +254,31 @@ export const calculatePrayerStats = (prayerData) => {
 };
 
 // Get monthly statistics
-export const getMonthlyStats = async (userId, year, month) => {
+export const getMonthlyStats = async (userId, year, month, masjidMode = false) => {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0); // Last day of month
   
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData);
+  return calculatePrayerStats(prayerData, masjidMode);
 };
 
 // Get yearly statistics
-export const getYearlyStats = async (userId, year) => {
+export const getYearlyStats = async (userId, year, masjidMode = false) => {
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31);
   
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData);
+  return calculatePrayerStats(prayerData, masjidMode);
 };
 
 // Get last N days statistics
-export const getRecentStats = async (userId, days = 30) => {
+export const getRecentStats = async (userId, days = 30, masjidMode = false) => {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days + 1);
   
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData);
+  return calculatePrayerStats(prayerData, masjidMode);
 };
 
 // Get motivational insights

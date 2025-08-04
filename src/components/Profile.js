@@ -12,7 +12,8 @@ import {
   Database,
   Shield,
   Eye,
-  EyeOff
+  EyeOff,
+  Building
 } from 'lucide-react';
 import { 
   doc, 
@@ -39,6 +40,7 @@ const Profile = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
+  const [isMasjidModeEnabled, setIsMasjidModeEnabled] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -48,12 +50,19 @@ const Profile = () => {
           setUserNickname(nickname || 'User');
           setNewNickname(nickname || '');
           
-          // Get user document to check privacy setting
+          // Get user document to check privacy and masjid mode settings
           const userDocRef = doc(db, 'users', currentUser.uid);
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setIsPrivacyEnabled(userData.isPrivate || false);
+            setIsMasjidModeEnabled(userData.masjidMode || false);
+          } else {
+            // For new users, set default values
+            await updateDoc(userDocRef, {
+              isPrivate: false,
+              masjidMode: false
+            });
           }
           
           // Calculate total days tracked
@@ -127,6 +136,29 @@ const Profile = () => {
     } catch (error) {
       console.error('Error updating privacy setting:', error);
       alert('Failed to update privacy setting. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMasjidModeToggle = async () => {
+    try {
+      setLoading(true);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const newMasjidModeState = !isMasjidModeEnabled;
+      
+      await updateDoc(userDocRef, {
+        masjidMode: newMasjidModeState
+      });
+      
+      setIsMasjidModeEnabled(newMasjidModeState);
+      alert(newMasjidModeState 
+        ? 'Masjid Mode enabled: Prayer scoring adjusted for home prayers (Qaza: 13pts, Prayed: 27pts)' 
+        : 'Masjid Mode disabled: Standard scoring enabled (Qaza: 0.5pts, Home: 1pt, Masjid: 27pts)'
+      );
+    } catch (error) {
+      console.error('Error updating masjid mode setting:', error);
+      alert('Failed to update masjid mode setting. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -352,6 +384,49 @@ const Profile = () => {
                 <><EyeOff className="w-3 h-3" /> Your data is hidden from global leaderboards</>
               ) : (
                 <><Eye className="w-3 h-3" /> Your data is visible on global leaderboards</>
+              )}
+            </div>
+          </div>
+
+          {/* Masjid Mode Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Prayer Scoring Mode</label>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Building className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {isMasjidModeEnabled ? 'Home Prayer Mode' : 'Standard Mode'}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {isMasjidModeEnabled 
+                      ? 'Optimized for home prayers (Qaza: 13pts, Prayed: 27pts)' 
+                      : 'Standard scoring (Qaza: 0.5pts, Home: 1pt, Masjid: 27pts)'
+                    }
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleMasjidModeToggle}
+                disabled={loading}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                  isMasjidModeEnabled ? 'bg-green-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`absolute h-4 w-4 rounded-full bg-white transition-all duration-200 ease-in-out ${
+                    isMasjidModeEnabled 
+                      ? 'left-[0.875rem] md:left-6' 
+                      : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+              {isMasjidModeEnabled ? (
+                <><Building className="w-3 h-3" /> Home prayer mode active - fair scoring for all users</>
+              ) : (
+                <><Building className="w-3 h-3" /> Standard mode - includes masjid prayer bonus</>
               )}
             </div>
           </div>
