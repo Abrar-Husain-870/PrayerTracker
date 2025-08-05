@@ -31,10 +31,6 @@ const UpdateNotification = () => {
     setShowUpdatePrompt(false);
   };
 
-  const handleForceRefresh = () => {
-    setIsUpdating(true);
-    updateManager.forceRefresh();
-  };
 
   if (!showUpdatePrompt) {
     return null;
