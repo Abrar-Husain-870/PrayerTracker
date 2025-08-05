@@ -7,6 +7,7 @@ import Profile from './components/Profile';
 import Leaderboard from './components/Leaderboard';
 import Rules from './components/Rules';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import UpdateNotification from './components/UpdateNotification';
 import { LogOut, User, Calendar, TrendingUp, Trophy, BookOpen } from 'lucide-react';
 import './App.css';
 
@@ -45,6 +46,8 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <UpdateNotification />
+      <PWAInstallPrompt />
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2 sm:py-3">

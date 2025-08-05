@@ -1,6 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { DEBUG_LOGS_ENABLED } from './config/debug';
+
+// Hide all console logs if debug is disabled
+if (!DEBUG_LOGS_ENABLED) {
+  const noop = () => {};
+  // Overriding all major console methods
+  console.log = noop;
+  console.warn = noop;
+  console.error = noop;
+  console.info = noop;
+  console.debug = noop;
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -9,15 +21,4 @@ root.render(
   </React.StrictMode>
 );
 
-// Register service worker for PWA functionality
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
-}
+// Service worker registration is now handled by UpdateManager in App.js

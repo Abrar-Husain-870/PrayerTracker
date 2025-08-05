@@ -15,13 +15,15 @@ import {
   EyeOff,
   Building
 } from 'lucide-react';
+import RefreshAppButton from './RefreshAppButton';
 import { 
   doc, 
   updateDoc, 
   collection, 
   getDocs, 
   writeBatch,
-  getDoc 
+  getDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import { db } from '../firebase/config';
@@ -41,6 +43,10 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
   const [isMasjidModeEnabled, setIsMasjidModeEnabled] = useState(false);
+// --- Admin Delete User Modal State ---
+const [adminUserList, setAdminUserList] = useState([]);
+const [showAdminDeleteModal, setShowAdminDeleteModal] = useState(false);
+const [userToDelete, setUserToDelete] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -353,7 +359,7 @@ const Profile = () => {
                 <Shield className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {isPrivacyEnabled ? 'Private Mode' : 'Public Mode'}
+                    Public Mode
                   </p>
                   <p className="text-xs text-gray-600">
                     {isPrivacyEnabled 
@@ -396,7 +402,7 @@ const Profile = () => {
                 <Building className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {isMasjidModeEnabled ? 'Home Prayer Mode' : 'Standard Mode'}
+                    Home Prayer Mode
                   </p>
                   <p className="text-xs text-gray-600">
                     {isMasjidModeEnabled 
@@ -432,6 +438,9 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* App Updates */}
+      <RefreshAppButton />
 
       {/* Data Management */}
       <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
@@ -594,7 +603,147 @@ const Profile = () => {
           </div>
         </div>
       )}
-    </div>
+    {/* Admin-only Delete User Button for Abrar Husain */}
+    {currentUser && (currentUser.displayName === 'Abrar Husain' || userNickname === 'Abrar Husain' || currentUser.email === 'abrarhusain@example.com') && (
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={async () => {
+            setLoading(true);
+            try {
+              // Fetch all users for admin modal
+              const usersSnapshot = await getDocs(collection(db, 'users'));
+              setAdminUserList(usersSnapshot.docs.map(doc => {
+  const data = doc.data();
+  // Mask email if present in Firestore, but do not fetch or display it directly
+  let maskedEmail = 'Hidden';
+  if (data.email) {
+    const [user, domain] = data.email.split('@');
+    maskedEmail = user[0] + '***@***.' + (domain ? domain.split('.').pop() : 'com');
+  }
+  return {
+    id: doc.id,
+    nickname: data.nickname || data.displayName || 'No Nickname',
+    maskedEmail
+  };
+}));
+              setShowAdminDeleteModal(true);
+            } catch (err) {
+              alert('Failed to fetch users: ' + (err?.message || err));
+            } finally {
+              setLoading(false);
+            }
+          }}
+          className="px-6 py-2 bg-red-700 text-white font-bold rounded-lg hover:bg-red-800 shadow-lg transition-colors"
+        >
+          Delete Any User (Admin Only)
+        </button>
+      </div>
+    )}
+
+    {/* Admin Delete User Modal */}
+    {showAdminDeleteModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 overflow-y-auto max-h-[90vh]">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Delete Any User (Admin Only)</h3>
+          <p className="text-gray-600 mb-6">Select a user to delete. This action is permanent and cannot be undone.</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="px-3 py-2 border">Nickname</th>
+                  <th className="px-3 py-2 border">Masked Email</th>
+                  <th className="px-3 py-2 border">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminUserList.map(user => (
+                  <tr key={user.id} className="border-b">
+                    <td className="px-3 py-2 border">{user.nickname || user.displayName || 'No Nickname'}</td>
+                    <td className="px-3 py-2 border">{user.maskedEmail}</td>
+                    <td className="px-3 py-2 border">
+                      <button
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                        onClick={() => setUserToDelete(user)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => setShowAdminDeleteModal(false)}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Per-user Confirm Delete Modal */}
+    {userToDelete && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Confirm Delete</h3>
+          <p className="text-gray-600 mb-6">
+            Are you sure you want to delete user <span className="font-bold">{userToDelete.nickname || userToDelete.displayName || userToDelete.email}</span>?<br />
+            This will permanently delete their account and all data. This action cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  // Delete user document from Firestore
+                  const userDocRef = doc(db, 'users', userToDelete.id);
+                  await getDocs(collection(userDocRef, 'prayers')).then(snapshot => {
+                    const batch = writeBatch(db);
+                    snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+                    return batch.commit();
+                  });
+                  await getDocs(collection(userDocRef, 'other')).then(snapshot => {
+                    const batch = writeBatch(db);
+                    snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+                    return batch.commit();
+                  }).catch(() => {});
+                  await updateDoc(userDocRef, {});
+const userDocSnap = await getDoc(userDocRef);
+if (userDocSnap.exists()) {
+  await deleteDoc(userDocRef);
+}
+                  // Optionally: delete from Auth via backend admin SDK (cannot from frontend)
+                  // Remove from local list
+                  setAdminUserList(list => list.filter(u => u.id !== userToDelete.id));
+                  setUserToDelete(null);
+                  alert('User deleted from Firestore. (Note: Auth deletion requires server-side admin privileges.)');
+                } catch (err) {
+                  alert('Failed to delete user: ' + (err?.message || err));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </button>
+            <button
+              onClick={() => setUserToDelete(null)}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+  </div>
   );
 };
 

@@ -1105,7 +1105,6 @@ const Leaderboard = () => {
             {getProfileIcon(requesterData.nickname)}
             <div className="min-w-0 flex-1">
               <h4 className="font-semibold text-gray-800 truncate">{requesterData.nickname}</h4>
-              <p className="text-sm text-gray-500 truncate">{requesterData.email}</p>
               <p className="text-xs text-gray-400">Wants to be your friend</p>
             </div>
           </div>
@@ -1175,7 +1174,6 @@ const Leaderboard = () => {
             {getProfileIcon(userData.nickname)}
             <div className="min-w-0 flex-1">
               <h4 className="font-semibold text-gray-800 truncate">{userData.nickname}</h4>
-              <p className="text-sm text-gray-500 truncate">{userData.email}</p>
               <p className="text-xs text-gray-400">Request pending...</p>
             </div>
           </div>

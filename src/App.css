@@ -22,6 +22,35 @@
   }
 }
 
+/* Orientation lock - respect device auto-rotate setting */
+@media screen and (max-width: 768px) {
+  html {
+    /* Lock to portrait orientation on mobile devices */
+    -webkit-transform-origin: center center;
+    -webkit-transform: rotate(0deg);
+    transform-origin: center center;
+    transform: rotate(0deg);
+  }
+  
+  /* Only allow rotation when device orientation lock is off */
+  @media (orientation: landscape) and (max-height: 480px) {
+    html {
+      /* Allow landscape only for very wide screens (tablets) */
+      -webkit-transform: none;
+      transform: none;
+    }
+  }
+}
+
+/* Prevent rotation for PWA when installed */
+@media (display-mode: standalone) {
+  html {
+    -ms-orientation: portrait;
+    -webkit-orientation: portrait;
+    orientation: portrait;
+  }
+}
+
 /* Custom Calendar Styles */
 .react-calendar {
   @apply w-full border-none bg-transparent;
