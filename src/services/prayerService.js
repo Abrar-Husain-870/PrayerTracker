@@ -6,7 +6,9 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy 
+  orderBy,
+  updateDoc,
+  deleteField
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -73,39 +75,24 @@ export const SURAH_COLORS = {
 // Save prayer status for a specific date and prayer
 export const savePrayerStatus = async (userId, date, prayer, status) => {
   try {
-    // Fix timezone issue by formatting date properly
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const docRef = doc(db, 'users', userId, 'prayers', dateStr);
-    
-    console.log('Firestore Debug - Saving to:', { userId, dateStr, prayer, status });
-    
-    // Get existing data for the date
-    const docSnap = await getDoc(docRef);
-    const existingData = docSnap.exists() ? docSnap.data() : {};
-    
-    console.log('Firestore Debug - Existing data:', existingData);
-    
-    // Update the specific prayer
-    const updatedData = {
-      ...existingData,
-      lastUpdated: new Date()
-    };
-    
-    // Only add the prayer key if status is not null
+
+    // To ensure the document exists before updating, we can use set with merge
+    // This creates the document if it doesn't exist, without overwriting other fields
+    await setDoc(docRef, { lastUpdated: new Date() }, { merge: true });
+
+    // Now, update the specific prayer field
+    const payload = {};
     if (status !== null) {
-      updatedData[prayer] = status;
-      console.log(`Firestore Debug - Adding key ${prayer} with value:`, status);
+      payload[prayer] = status;
     } else {
-      // If status is null, remove the key from the document
-      delete updatedData[prayer];
-      console.log(`Firestore Debug - Removing key ${prayer} from document`);
+      // Use deleteField() to remove the prayer key from the document
+      payload[prayer] = deleteField();
     }
-    
-    console.log('Firestore Debug - Updated data to save:', updatedData);
-    
-    // Use setDoc without merge to ensure deleted keys are actually removed
-    await setDoc(docRef, updatedData);
-    console.log('Firestore Debug - Successfully saved to Firestore');
+
+    await updateDoc(docRef, payload);
+
     return true;
   } catch (error) {
     console.error('Error saving prayer status:', error);

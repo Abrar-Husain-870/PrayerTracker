@@ -107,8 +107,9 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
   // Calculate statistics
   let currentStreakCount = 0;
   let bestStreakCount = 0;
-  let lastDateHadAllPrayers = false;
+  let tempStreak = 0;
 
+  // Calculate best streak (ascending order)
   dates.forEach(date => {
     const dayData = prayerData[date];
     // Fix timezone issue by parsing date components directly
@@ -216,15 +217,60 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
     if (dayHasAllGoodPrayers) {
       currentStreakCount++;
       bestStreakCount = Math.max(bestStreakCount, currentStreakCount);
-      lastDateHadAllPrayers = true;
     } else {
       currentStreakCount = 0;
-      lastDateHadAllPrayers = false;
     }
   });
 
   stats.bestStreak = bestStreakCount;
-  stats.currentStreak = lastDateHadAllPrayers ? currentStreakCount : 0;
+
+  // Calculate current streak (descending order)
+  // Count consecutive fully completed days from most recent backwards
+  tempStreak = 0;
+  const todayStr = (() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
+  
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const date = dates[i];
+    const dayData = prayerData[date];
+    let markedPrayersCount = 0;
+    let dayHasAllGoodPrayers = true;
+    
+    Object.values(PRAYER_TYPES).forEach(prayer => {
+      if (dayData[prayer] !== undefined && dayData[prayer] !== null && dayData[prayer] !== '') {
+        const status = dayData[prayer];
+        markedPrayersCount++;
+        if (status === PRAYER_STATUS.NOT_PRAYED || status === PRAYER_STATUS.QAZA) {
+          dayHasAllGoodPrayers = false;
+        }
+      } else {
+        dayHasAllGoodPrayers = false;
+      }
+    });
+    
+    if (markedPrayersCount !== 5) {
+      dayHasAllGoodPrayers = false;
+    }
+    
+    // Skip today if it's incomplete (not all 5 prayers marked)
+    if (date === todayStr && markedPrayersCount < 5) {
+      continue;
+    }
+    
+    if (dayHasAllGoodPrayers) {
+      tempStreak++;
+    } else {
+      // Break immediately on first incomplete/broken day
+      break;
+    }
+  }
+  
+  stats.currentStreak = tempStreak;
   
   // Set totalDays to actual days tracked (not all days in range)
   stats.totalDays = dates.length;

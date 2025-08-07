@@ -1,0 +1,13 @@
+.prayer-tile {
+  position: relative;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.prayer-tile:hover {
+  background-color: #fef3c7; /* A light yellow for hover, adjust as needed */
+}
+
+/* Hide the default number inside the calendar tile */
+.prayer-tile abbr {
+  visibility: hidden;
+}
