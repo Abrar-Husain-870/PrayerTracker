@@ -595,7 +595,9 @@ const Leaderboard = () => {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timePeriod, masjidModeFilter, currentUser?.uid]);
+
 
   const fetchUserFriends = useCallback(async () => {
     try {
@@ -708,6 +710,7 @@ const Leaderboard = () => {
     } catch (error) {
       console.error('Error fetching user friends:', error);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, getUserNickname]);
 
   const fetchFriendRequests = useCallback(async () => {
