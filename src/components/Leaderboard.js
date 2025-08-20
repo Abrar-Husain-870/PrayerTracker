@@ -595,7 +595,7 @@ const Leaderboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [timePeriod, masjidModeFilter, currentUser?.uid]);
+  }, [timePeriod, masjidModeFilter, currentUser?.uid, calculateUserScore]);
 
   const fetchUserFriends = useCallback(async () => {
     try {
@@ -708,7 +708,7 @@ const Leaderboard = () => {
     } catch (error) {
       console.error('Error fetching user friends:', error);
     }
-  }, [currentUser?.uid, getUserNickname]);
+  }, [currentUser?.uid, getUserNickname, calculateUserScore, timePeriod]);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
