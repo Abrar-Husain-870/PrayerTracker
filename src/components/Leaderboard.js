@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Trophy, 
@@ -82,9 +82,9 @@ const Leaderboard = () => {
     }
   }, [notification]);
 
-  const showNotification = (type, message) => {
+  const showNotification = useCallback((type, message) => {
     setNotification({ type, message });
-  };
+  }, []);
 
   // Calculate theoretical maximum average score for the current time period
   const calculateTheoreticalMaxAverage = () => {
@@ -140,14 +140,6 @@ const Leaderboard = () => {
     const fridayBonusPoints = 10;
     const totalMaxPoints = (totalDays * dailyMaxPoints) + (fridayCount * fridayBonusPoints);
     const theoreticalMaxAverage = totalMaxPoints / totalDays;
-    
-    // Debug logging
-    console.log(`Theoretical Max Calculation for ${timePeriod}:`, {
-      totalDays,
-      fridayCount,
-      totalMaxPoints,
-      theoreticalMaxAverage: theoreticalMaxAverage.toFixed(2)
-    });
     
     return theoreticalMaxAverage;
   };
@@ -280,6 +272,38 @@ const Leaderboard = () => {
         </div>
       </div>
     );
+  };
+
+  const calculateDaysSinceLastActivity = async (userId) => {
+    try {
+      // Get the most recent prayer data for this user
+      const currentDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(currentDate.getDate() - 60); // Check last 60 days
+      
+      const prayerData = await getPrayerDataInRange(userId, startDate, currentDate);
+      
+      if (!prayerData || Object.keys(prayerData).length === 0) {
+        return 999; // No activity found in last 60 days
+      }
+      
+      // Find the most recent date with any prayer data
+      const dates = Object.keys(prayerData).sort().reverse();
+      const mostRecentDate = dates[0];
+      
+      if (!mostRecentDate) {
+        return 999;
+      }
+      
+      // Calculate days since that date
+      const lastActivityDate = new Date(mostRecentDate);
+      const daysDiff = Math.floor((currentDate - lastActivityDate) / (1000 * 60 * 60 * 24));
+      
+      return Math.max(0, daysDiff);
+    } catch (error) {
+      console.error('Error calculating days since last activity:', error);
+      return 999; // Default to inactive if error occurs
+    }
   };
 
   const calculateCompositeScore = (stats) => {
@@ -437,6 +461,9 @@ const Leaderboard = () => {
         stats.trend = 'stable';
       }
 
+      // Calculate days since last activity
+      stats.daysSinceLastActivity = await calculateDaysSinceLastActivity(userId);
+
       // Calculate composite ranking score
       stats.compositeScore = calculateCompositeScore(stats);
       
@@ -454,12 +481,13 @@ const Leaderboard = () => {
         surahAlKahfConsistency: 0,
         prayerBreakdown: {},
         trend: 'stable',
-        compositeScore: 0
+        compositeScore: 0,
+        daysSinceLastActivity: 999
       };
     }
   };
 
-  const fetchLeaderboardData = async () => {
+  const fetchLeaderboardData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -479,49 +507,78 @@ const Leaderboard = () => {
             email: userData.email,
             isPrivate: userData.isPrivate || false,
             masjidMode: userData.masjidMode || false,
-            averageScore: stats.averageScore,
-            totalDays: stats.totalDays,
-            totalScore: stats.totalScore,
-            consistency: stats.consistency,
-            currentStreak: stats.currentStreak,
-            bestStreak: stats.bestStreak,
-            masjidPercentage: stats.masjidPercentage,
-            trend: stats.trend,
-            compositeScore: stats.compositeScore
+            ...stats
           };
         })
       );
 
-      // Sort by sophisticated composite score (descending)
-      const sortedUsers = usersWithScores
-        .filter(user => user.totalDays > 0) // Only show users with data
-        .sort((a, b) => {
-          // Primary: Composite Score
-          if (b.compositeScore !== a.compositeScore) {
-            return b.compositeScore - a.compositeScore;
-          }
-          // Tiebreaker 1: Average Score
-          if (b.averageScore !== a.averageScore) {
-            return b.averageScore - a.averageScore;
-          }
-          // Tiebreaker 2: Current Streak
-          if (b.currentStreak !== a.currentStreak) {
-            return b.currentStreak - a.currentStreak;
-          }
-          // Tiebreaker 3: Total Days (more experience)
-          return b.totalDays - a.totalDays;
-        });
-
-      // Filter out private users for global leaderboard display
-      let publicUsers = sortedUsers.filter(user => !user.isPrivate);
-      
-      // Apply Masjid Mode filter if specified
+      // Filter by masjid mode if needed
+      let filteredUsers = usersWithScores;
       if (masjidModeFilter === 'on') {
-        publicUsers = publicUsers.filter(user => user.masjidMode === true);
+        filteredUsers = usersWithScores.filter(user => user.masjidMode === true);
       } else if (masjidModeFilter === 'off') {
-        publicUsers = publicUsers.filter(user => user.masjidMode === false);
+        filteredUsers = usersWithScores.filter(user => user.masjidMode === false);
       }
-      // If masjidModeFilter === 'all', show all public users (no additional filtering)
+
+      // Define activity criteria based on time period
+      const getActivityThreshold = () => {
+        const now = new Date();
+        switch (timePeriod) {
+          case 'week':
+            return { minDays: 3, inactiveDays: 7 }; // Must have 3+ days, inactive if no activity in 7 days
+          case 'month':
+            return { minDays: 7, inactiveDays: 14 }; // Must have 7+ days, inactive if no activity in 14 days
+          case 'year':
+            return { minDays: 30, inactiveDays: 30 }; // Must have 30+ days, inactive if no activity in 30 days
+          case 'all':
+            return { minDays: 14, inactiveDays: 30 }; // Must have 14+ days, inactive if no activity in 30 days
+          default:
+            return { minDays: 7, inactiveDays: 14 };
+        }
+      };
+
+      const { minDays, inactiveDays } = getActivityThreshold();
+
+      // Separate active and inactive users
+      const activeUsers = [];
+      const inactiveUsers = [];
+
+      filteredUsers.forEach(user => {
+        const isActive = user.totalDays >= minDays && user.daysSinceLastActivity <= inactiveDays;
+        if (isActive) {
+          activeUsers.push(user);
+        } else {
+          inactiveUsers.push(user);
+        }
+      });
+
+      // Sort active users by composite score
+      const sortedActiveUsers = activeUsers.sort((a, b) => {
+        if (b.compositeScore !== a.compositeScore) {
+          return b.compositeScore - a.compositeScore;
+        }
+        if (b.averageScore !== a.averageScore) {
+          return b.averageScore - a.averageScore;
+        }
+        if (b.currentStreak !== a.currentStreak) {
+          return b.currentStreak - a.currentStreak;
+        }
+        return b.totalDays - a.totalDays;
+      });
+
+      // Sort inactive users by total days (to show most committed inactive users first)
+      const sortedInactiveUsers = inactiveUsers.sort((a, b) => {
+        if (b.totalDays !== a.totalDays) {
+          return b.totalDays - a.totalDays;
+        }
+        return b.compositeScore - a.compositeScore;
+      });
+
+      // Combine: active users first, then inactive users
+      const sortedUsers = [...sortedActiveUsers, ...sortedInactiveUsers];
+
+      // Filter out private users for global leaderboard
+      const publicUsers = sortedUsers.filter(user => !user.isPrivate);
 
       // Find current user's rank (in the full sorted list, including private users)
       const currentUserIndex = sortedUsers.findIndex(user => user.id === currentUser.uid);
@@ -538,9 +595,9 @@ const Leaderboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timePeriod, masjidModeFilter, currentUser?.uid]);
 
-  const fetchUserFriends = async () => {
+  const fetchUserFriends = useCallback(async () => {
     try {
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userDocRef);
@@ -651,9 +708,9 @@ const Leaderboard = () => {
     } catch (error) {
       console.error('Error fetching user friends:', error);
     }
-  };
+  }, [currentUser?.uid, getUserNickname]);
 
-  const fetchFriendRequests = async () => {
+  const fetchFriendRequests = useCallback(async () => {
     try {
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userDocRef);
@@ -716,10 +773,7 @@ const Leaderboard = () => {
           });
         }
         
-        console.log('DEBUG: Setting friend requests state:', {
-          sentRequests: validatedSentRequests,
-          receivedRequests: validatedReceivedRequests
-        });
+        // Set validated friend requests state
         
         setFriendRequestsSent(validatedSentRequests);
         setFriendRequestsReceived(validatedReceivedRequests);
@@ -727,9 +781,9 @@ const Leaderboard = () => {
     } catch (error) {
       console.error('Error fetching friend requests:', error);
     }
-  };
+  }, [currentUser?.uid]);
 
-  const searchUsers = async (searchTerm) => {
+  const searchUsers = useCallback(async (searchTerm) => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       return;
@@ -767,7 +821,7 @@ const Leaderboard = () => {
     } finally {
       setSearchLoading(false);
     }
-  };
+  }, [currentUser?.uid, getUserNickname, userFriends]);
 
   // Unused function - commented out to fix ESLint warnings
   // const addFriendByUser = async (friendUser) => {
@@ -786,7 +840,7 @@ const Leaderboard = () => {
   //   }
   // };
 
-  const sendFriendRequest = async (userToAdd) => {
+  const sendFriendRequest = useCallback(async (userToAdd) => {
     try {
       const currentUserNickname = await getUserNickname(currentUser.uid);
       
@@ -827,9 +881,9 @@ const Leaderboard = () => {
       console.error('Error sending friend request:', error);
       showNotification('error', 'Failed to send friend request. Please try again.');
     }
-  };
+  }, [currentUser?.uid, getUserNickname, userFriends, friendRequestsSent, fetchFriendRequests, showNotification]);
 
-  const acceptFriendRequest = async (requesterId) => {
+  const acceptFriendRequest = useCallback(async (requesterId) => {
     try {
       const currentUserNickname = await getUserNickname(currentUser.uid);
       
@@ -869,7 +923,7 @@ const Leaderboard = () => {
       console.error('Error accepting friend request:', error);
       showNotification('error', 'Failed to accept friend request. Please try again.');
     }
-  };
+  }, [currentUser?.uid, getUserNickname, fetchUserFriends, fetchFriendRequests, showNotification]);
 
   const declineFriendRequest = async (requesterId) => {
     try {
@@ -1201,27 +1255,42 @@ const Leaderboard = () => {
     );
   };
 
-  const renderLeaderboardItem = (user, rank, isCurrentUser = false, showAddButton = false) => (
-    <div 
-      key={user.id} 
-      className={`p-4 rounded-lg border transition-colors ${
-        isCurrentUser 
-          ? 'bg-primary-50 border-primary-200 shadow-md' 
-          : 'bg-white border-gray-200 hover:bg-gray-50'
-      }`}
-    >
-      {/* Main Row */}
-      <div className="flex items-center justify-between">
+  const renderLeaderboardItem = (user, rank, isCurrentUser = false, showAddButton = false, isInactive = false) => {
+    // Special styling for top 3 positions
+    const getTopThreeStyle = () => {
+      if (rank === 1) {
+        return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 shadow-lg';
+      } else if (rank === 2) {
+        return 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 shadow-md';
+      } else if (rank === 3) {
+        return 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 shadow-md';
+      }
+      return '';
+    };
+
+    const cardStyle = rank <= 3 
+      ? getTopThreeStyle()
+      : isCurrentUser 
+        ? 'bg-primary-50 border-primary-200 shadow-md'
+        : 'bg-white border-gray-200 hover:bg-gray-50';
+
+    return (
+      <div 
+        key={user.id} 
+        className={`p-3 sm:p-4 rounded-lg border transition-colors ${cardStyle}`}
+      >
+      {/* Desktop: Two-column layout with score on right */}
+      <div className={`hidden sm:flex items-start justify-between ${isInactive ? 'opacity-75' : ''}`}>
         <div className="flex items-center gap-4">
           {getRankIcon(rank)}
           {getProfileIcon(user.nickname)}
           <div>
             <div className="flex items-center gap-2">
-              <h3 className={`font-semibold ${
+              <h3 className={`text-base font-semibold ${
                 isCurrentUser ? 'text-primary-800' : 'text-gray-800'
               }`}>
                 {user.nickname}
-                {isCurrentUser && <span className="text-primary-600 ml-2">(You)</span>}
+                {isCurrentUser && <span className="text-primary-600 ml-2 text-sm">(You)</span>}
               </h3>
               {user.trend && getTrendIcon(user.trend)}
             </div>
@@ -1229,77 +1298,107 @@ const Leaderboard = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className={`text-2xl font-bold ${
-              isCurrentUser ? 'text-primary-600' : 'text-gray-800'
-            }`}>
-              {user.compositeScore ? user.compositeScore.toFixed(1) : user.averageScore.toFixed(2)}
+        {/* Score - Desktop */}
+        <div className="text-right">
+          <p className={`text-2xl font-bold ${
+            isCurrentUser ? 'text-primary-600' : 'text-gray-800'
+          }`}>
+            {user.compositeScore ? user.compositeScore.toFixed(1) : (user.averageScore || 0).toFixed(2)}
+          </p>
+          <p className="text-sm text-gray-500">
+            {user.compositeScore ? 'composite score' : 'avg score'}
+          </p>
+          {user.compositeScore && (
+            <p className="text-xs text-gray-400">
+              avg: {(user.averageScore || 0).toFixed(1)}
             </p>
-            <p className="text-sm text-gray-500">
-              {user.compositeScore ? 'composite score' : 'avg score'}
-            </p>
-            {user.compositeScore && (
-              <p className="text-xs text-gray-400">
-                avg: {user.averageScore.toFixed(1)}
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
-      
-      {/* Competitive Metrics Row - Always show for users with data */}
+
+      {/* Mobile: Compact single-row layout */}
+      <div className={`flex sm:hidden items-center justify-between ${isInactive ? 'opacity-75' : ''}`}>
+        <div className="flex items-center gap-2">
+          {getRankIcon(rank)}
+          {getProfileIcon(user.nickname)}
+          <div>
+            <div className="flex items-center gap-1">
+              <h3 className={`text-sm font-semibold ${
+                isCurrentUser ? 'text-primary-800' : 'text-gray-800'
+              }`}>
+                {user.nickname}
+                {isCurrentUser && <span className="text-primary-600 ml-1 text-xs">(You)</span>}
+              </h3>
+              {user.trend && getTrendIcon(user.trend)}
+            </div>
+            <p className="text-xs text-gray-500">{user.totalDays} days</p>
+          </div>
+        </div>
+        
+        {/* Score - Mobile */}
+        <div className="text-right">
+          <p className={`text-lg font-bold ${
+            isCurrentUser ? 'text-primary-600' : 'text-gray-800'
+          }`}>
+            {user.compositeScore ? user.compositeScore.toFixed(1) : (user.averageScore || 0).toFixed(2)}
+          </p>
+          <p className="text-xs text-gray-500">
+            {user.compositeScore ? 'composite' : 'avg'}
+          </p>
+          {user.compositeScore && (
+            <p className="text-xs text-gray-400">
+              avg: {(user.averageScore || 0).toFixed(1)}
+            </p>
+          )}
+        </div>
+      </div>
+        
+      {/* Metrics Row */}
       {user.totalDays > 0 && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Always show streak (0 if no streak) */}
-            {/* Competitive metrics row */}
-            <div className="flex items-center gap-2 mt-1">
-              {/* Current Streak - Red */}
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-xs text-gray-400 font-medium">Current</span>
-                {user.currentStreak > 0 ? (
-                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">
-                    <Flame className="w-3 h-3" />
-                    {user.currentStreak}d
-                  </div>
-                ) : (
-                  <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0d</span>
-                )}
+        <div className={`flex items-center gap-2 sm:gap-3 mt-3 ${isInactive ? 'opacity-75' : ''}`}>
+          {/* Current Streak */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-xs text-gray-400 font-medium">Current</span>
+            {user.currentStreak > 0 ? (
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                <Flame className="w-3 h-3" />
+                {user.currentStreak}d
               </div>
-              
-              {/* Best Streak - Green (only show if different from current) */}
-              {user.bestStreak > 0 && user.bestStreak !== user.currentStreak && (
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-xs text-gray-400 font-medium">Best</span>
-                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">
-                    <Trophy className="w-3 h-3" />
-                    {user.bestStreak}d
-                  </div>
-                </div>
-              )}
-              
-              {/* Consistency */}
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-xs text-gray-400 font-medium">Consistency</span>
-                {getConsistencyBadge(user.consistency)}
-              </div>
-              
-              {/* Masjid Percentage */}
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-xs text-gray-400 font-medium">Masjid</span>
-                {user.masjidPercentage > 0 ? getMasjidBadge(user.masjidPercentage) : (
-                  <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0%</span>
-                )}
+            ) : (
+              <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0d</span>
+            )}
+          </div>
+          
+          {/* Best Streak (only if different from current) */}
+          {user.bestStreak > 0 && user.bestStreak !== user.currentStreak && (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-xs text-gray-400 font-medium">Best</span>
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                <Trophy className="w-3 h-3" />
+                {user.bestStreak}d
               </div>
             </div>
+          )}
+          
+          {/* Consistency Badge */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-xs text-gray-400 font-medium">Consistency</span>
+            {getConsistencyBadge(user.consistency)}
+          </div>
+          
+          {/* Masjid Percentage */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-xs text-gray-400 font-medium">Masjid</span>
+            {user.masjidPercentage > 0 ? getMasjidBadge(user.masjidPercentage) : (
+              <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0%</span>
+            )}
           </div>
         </div>
       )}
       
       {/* Action Buttons Row - Show for all users except current user */}
       {!isCurrentUser && (
-        <div className="flex justify-center mt-3 pt-3 border-t border-gray-100">
+        <div className="flex justify-center mt-3">
           {userFriends.includes(user.nickname) ? (
             // Already friends - show remove button
             <button
@@ -1354,7 +1453,8 @@ const Leaderboard = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   if (!currentUser) {
     return <div>Please log in to view the leaderboard.</div>;
@@ -1598,11 +1698,79 @@ const Leaderboard = () => {
           <div className="space-y-3">
             {activeTab === 'global' ? (
               leaderboardData.length > 0 ? (
-                leaderboardData.map((user, index) => {
-                  const isCurrentUser = user.id === currentUser.uid;
-                  const canAddFriend = !isCurrentUser && !userFriends.includes(user.nickname);
-                  return renderLeaderboardItem(user, index + 1, isCurrentUser, canAddFriend);
-                })
+                (() => {
+                  // Separate active and inactive users for display
+                  const getActivityThreshold = () => {
+                    switch (timePeriod) {
+                      case 'week': return { minDays: 3, inactiveDays: 7 };
+                      case 'month': return { minDays: 7, inactiveDays: 14 };
+                      case 'year': return { minDays: 30, inactiveDays: 30 };
+                      case 'all': return { minDays: 14, inactiveDays: 30 };
+                      default: return { minDays: 7, inactiveDays: 14 };
+                    }
+                  };
+
+                  const { minDays, inactiveDays } = getActivityThreshold();
+                  const activeUsers = [];
+                  const inactiveUsers = [];
+                  let currentRank = 1;
+
+                  leaderboardData.forEach(user => {
+                    const isActive = user.totalDays >= minDays && user.daysSinceLastActivity <= inactiveDays;
+                    if (isActive) {
+                      activeUsers.push({ ...user, displayRank: currentRank++ });
+                    } else {
+                      inactiveUsers.push({ ...user, displayRank: currentRank++ });
+                    }
+                  });
+
+                  return (
+                    <div className="space-y-4 sm:space-y-6">
+                      {/* Active Users Section */}
+                      {activeUsers.length > 0 && (
+                        <div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-3 sm:mb-4 pb-2 border-b border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-800">Active Users</h3>
+                              <span className="text-sm text-gray-500">({activeUsers.length})</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2 sm:space-y-3">
+                            {activeUsers.map(user => {
+                              const isCurrentUser = user.id === currentUser.uid;
+                              const canAddFriend = !isCurrentUser && !userFriends.includes(user.nickname);
+                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend);
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Inactive Users Section */}
+                      {inactiveUsers.length > 0 && (
+                        <div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-3 sm:mb-4 pb-2 border-b border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-600">Inactive Users</h3>
+                              <span className="text-sm text-gray-500">({inactiveUsers.length})</span>
+                            </div>
+                            <span className="text-xs text-gray-400 sm:ml-2">
+                              Less than {minDays} days tracked or inactive {inactiveDays}+ days
+                            </span>
+                          </div>
+                          <div className="space-y-2 sm:space-y-3">
+                            {inactiveUsers.map(user => {
+                              const isCurrentUser = user.id === currentUser.uid;
+                              const canAddFriend = !isCurrentUser && !userFriends.includes(user.nickname);
+                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend, true);
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-300" />
