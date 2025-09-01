@@ -1336,8 +1336,8 @@ const Leaderboard = () => {
     const cardStyle = rank <= 3 
       ? getTopThreeStyle()
       : isCurrentUser 
-        ? 'bg-primary-50 border-primary-200 shadow-md dark:bg-\[\#0a0a0a\] dark:border-primary-900'
-        : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-black dark:border-gray-800 dark:hover:bg-\[\#0a0a0a\]';
+        ? 'bg-primary-50 border-primary-200 shadow-md dark:bg-[#0a0a0a] dark:border-primary-900'
+        : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-black dark:border-gray-800 dark:hover:bg-[#0a0a0a]';
 
     return (
       <div 
