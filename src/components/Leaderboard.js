@@ -19,7 +19,8 @@ import {
   BarChart3,
   TrendingDown,
   Minus,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { 
   collection, 
@@ -38,7 +39,7 @@ import { getMonthlyStats, getYearlyStats, calculatePrayerStats, getPrayerDataInR
 const Leaderboard = () => {
   const { currentUser, getUserNickname } = useAuth();
   const [activeTab, setActiveTab] = useState('global'); // 'global', 'friends', or 'requests'
-  const [timePeriod, setTimePeriod] = useState('month'); // 'week', 'month', 'year', 'all'
+  const [timePeriod, setTimePeriod] = useState('all'); // Default to 'all' (All Time)
   const [masjidModeFilter, setMasjidModeFilter] = useState('all'); // 'all', 'on', 'off'
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [friendsData, setFriendsData] = useState([]);
@@ -55,6 +56,21 @@ const Leaderboard = () => {
   const [friendRequestsReceived, setFriendRequestsReceived] = useState([]);
   // const [showFriendRequests, setShowFriendRequests] = useState(false); // Unused for now
   const [notification, setNotification] = useState(null); // { type: 'success'|'error', message: 'text' }
+
+  // Load user preferences from localStorage
+  useEffect(() => {
+    if (currentUser) {
+      const savedTimePeriod = localStorage.getItem(`leaderboard_timePeriod_${currentUser.uid}`);
+      const savedMasjidModeFilter = localStorage.getItem(`leaderboard_masjidModeFilter_${currentUser.uid}`);
+      
+      if (savedTimePeriod) {
+        setTimePeriod(savedTimePeriod);
+      }
+      if (savedMasjidModeFilter) {
+        setMasjidModeFilter(savedMasjidModeFilter);
+      }
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -202,7 +218,7 @@ const Leaderboard = () => {
     ];
 
     return (
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 mt-6">
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 mt-6 dark:bg-black dark:border-gray-800 glass-card">
         <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-primary-600" />
           Friends Metrics Comparison
@@ -265,7 +281,7 @@ const Leaderboard = () => {
           ))}
         </div>
         
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="mt-4 pt-4 border-t border-purple-100 dark:border-gray-800">
           <p className="text-xs text-gray-500 text-center">
             💡 Tip: Higher bars indicate better performance in each metric
           </p>
@@ -425,7 +441,10 @@ const Leaderboard = () => {
         allTimeStats.consistency = allTimeStats.totalPrayers > 0 ? 
           ((allTimeStats.totalPrayers - (allTimeStats.prayerBreakdown['Not Prayed'] || 0)) / allTimeStats.totalPrayers) * 100 : 0;
         allTimeStats.masjidPercentage = allTimeStats.totalPrayers > 0 ? 
-          ((allTimeStats.prayerBreakdown['Masjid'] || 0) / allTimeStats.totalPrayers) * 100 : 0;
+          ((allTimeStats.prayerBreakdown['masjid'] || 0) / allTimeStats.totalPrayers) * 100 : 0;
+        
+        // Debug logging for masjid percentage
+        console.log('Debug - User:', userId, 'Total prayers:', allTimeStats.totalPrayers, 'Masjid prayers:', allTimeStats.prayerBreakdown['masjid'], 'Percentage:', allTimeStats.masjidPercentage);
         
         stats = allTimeStats;
       }
@@ -520,21 +539,14 @@ const Leaderboard = () => {
         filteredUsers = usersWithScores.filter(user => user.masjidMode === false);
       }
 
-      // Define activity criteria based on time period
+      // Define activity criteria - always use all-time approach to avoid marking active users as inactive
       const getActivityThreshold = () => {
-        const now = new Date();
-        switch (timePeriod) {
-          case 'week':
-            return { minDays: 3, inactiveDays: 7 }; // Must have 3+ days, inactive if no activity in 7 days
-          case 'month':
-            return { minDays: 7, inactiveDays: 14 }; // Must have 7+ days, inactive if no activity in 14 days
-          case 'year':
-            return { minDays: 30, inactiveDays: 30 }; // Must have 30+ days, inactive if no activity in 30 days
-          case 'all':
-            return { minDays: 14, inactiveDays: 30 }; // Must have 14+ days, inactive if no activity in 30 days
-          default:
-            return { minDays: 7, inactiveDays: 14 };
-        }
+        // Use consistent all-time criteria regardless of current filter
+        // This prevents users from being marked inactive at the start of new periods
+        return { 
+          minDays: 7,      // Must have tracked at least 7 days total (all-time)
+          inactiveDays: 14 // Inactive if no activity in last 14 days (regardless of filter)
+        };
       };
 
       const { minDays, inactiveDays } = getActivityThreshold();
@@ -543,8 +555,32 @@ const Leaderboard = () => {
       const activeUsers = [];
       const inactiveUsers = [];
 
-      filteredUsers.forEach(user => {
-        const isActive = user.totalDays >= minDays && user.daysSinceLastActivity <= inactiveDays;
+      // Get all-time stats for activity determination
+      const usersWithAllTimeActivity = await Promise.all(
+        filteredUsers.map(async (user) => {
+          try {
+            // Get all-time total days for this user (not filtered by current period)
+            const allTimeStats = await calculateUserScore(user.id, 'all');
+            return {
+              ...user,
+              allTimeTotalDays: allTimeStats.totalDays || 0
+            };
+          } catch (error) {
+            console.error('Error fetching all-time stats for user:', user.id, error);
+            return {
+              ...user,
+              allTimeTotalDays: 0
+            };
+          }
+        })
+      );
+
+      usersWithAllTimeActivity.forEach(user => {
+        // Use all-time total days for activity check, not filtered period days
+        const isActive = user.allTimeTotalDays >= minDays && user.daysSinceLastActivity <= inactiveDays;
+        // Store the activity status on the user object for later use in rendering
+        user.isActiveUser = isActive;
+        
         if (isActive) {
           activeUsers.push(user);
         } else {
@@ -1086,16 +1122,42 @@ const Leaderboard = () => {
     if (consistency === 0) return null;
     
     const getBadgeColor = (percent) => {
-      if (percent >= 90) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      if (percent >= 75) return 'bg-blue-100 text-blue-800 border-blue-200';
-      if (percent >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      if (percent >= 80) return 'bg-green-100 text-green-800 border-green-200';
+      if (percent >= 60) return 'bg-blue-100 text-blue-800 border-blue-200';
+      if (percent >= 40) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      return 'bg-red-100 text-red-800 border-red-200';
     };
 
     return (
       <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getBadgeColor(consistency)}`}>
         <Target className="w-3 h-3" />
         {consistency.toFixed(0)}%
+      </div>
+    );
+  };
+
+  const getLastTrackedBadge = (daysSince) => {
+    if (daysSince === undefined || daysSince === null) return null;
+    
+    const getBadgeColor = (days) => {
+      if (days === 0) return 'bg-green-100 text-green-800 border-green-200';
+      if (days <= 2) return 'bg-blue-100 text-blue-800 border-blue-200';
+      if (days <= 7) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      return 'bg-red-100 text-red-800 border-red-200';
+    };
+
+    const getDisplayText = (days) => {
+      if (days === 0) return 'Today';
+      if (days === 1) return '1d ago';
+      if (days <= 7) return `${days}d ago`;
+      if (days <= 30) return `${days}d ago`;
+      return '30+ days';
+    };
+
+    return (
+      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getBadgeColor(daysSince)}`}>
+        <Clock className="w-3 h-3" />
+        {getDisplayText(daysSince)}
       </div>
     );
   };
@@ -1140,7 +1202,7 @@ const Leaderboard = () => {
 
     if (loading) {
       return (
-        <div className="flex items-center justify-between p-4 rounded-lg border bg-white border-gray-200">
+        <div className="flex items-center justify-between p-4 rounded-lg border bg-white border-gray-200 dark:bg-black dark:border-gray-800">
           <div className="animate-pulse flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
             <div className="space-y-2">
@@ -1155,7 +1217,7 @@ const Leaderboard = () => {
     if (!requesterData) return null;
 
     return (
-      <div className="p-3 sm:p-4 rounded-lg border bg-white border-gray-200">
+      <div className="p-3 sm:p-4 rounded-lg border bg-white border-gray-200 dark:bg-black dark:border-gray-800">
         {/* Mobile: Stack vertically, Desktop: Side by side */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1209,7 +1271,7 @@ const Leaderboard = () => {
 
     if (loading) {
       return (
-        <div className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 border-gray-200">
+        <div className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 border-gray-200 dark:bg-black dark:border-gray-800">
           <div className="animate-pulse flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
             <div className="space-y-2">
@@ -1224,7 +1286,7 @@ const Leaderboard = () => {
     if (!userData) return null;
 
     return (
-      <div className="p-3 sm:p-4 rounded-lg border bg-gray-50 border-gray-200">
+      <div className="p-3 sm:p-4 rounded-lg border bg-gray-50 border-gray-200 dark:bg-black dark:border-gray-800">
         {/* Mobile: Stack vertically, Desktop: Side by side */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1262,11 +1324,11 @@ const Leaderboard = () => {
     // Special styling for top 3 positions
     const getTopThreeStyle = () => {
       if (rank === 1) {
-        return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 shadow-lg';
+        return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 shadow-lg dark:from-black dark:to-black dark:border-gray-700';
       } else if (rank === 2) {
-        return 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 shadow-md';
+        return 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 shadow-md dark:from-black dark:to-black dark:border-gray-700';
       } else if (rank === 3) {
-        return 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 shadow-md';
+        return 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 shadow-md dark:from-black dark:to-black dark:border-gray-700';
       }
       return '';
     };
@@ -1274,13 +1336,13 @@ const Leaderboard = () => {
     const cardStyle = rank <= 3 
       ? getTopThreeStyle()
       : isCurrentUser 
-        ? 'bg-primary-50 border-primary-200 shadow-md'
-        : 'bg-white border-gray-200 hover:bg-gray-50';
+        ? 'bg-primary-50 border-primary-200 shadow-md dark:bg-\[\#0a0a0a\] dark:border-primary-900'
+        : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-black dark:border-gray-800 dark:hover:bg-\[\#0a0a0a\]';
 
     return (
       <div 
         key={user.id} 
-        className={`p-3 sm:p-4 rounded-lg border transition-colors ${cardStyle}`}
+        className={`p-3 sm:p-4 rounded-lg border transition-colors ${cardStyle} glass-card`}
       >
       {/* Desktop: Two-column layout with score on right */}
       <div className={`hidden sm:flex items-start justify-between ${isInactive ? 'opacity-75' : ''}`}>
@@ -1368,7 +1430,7 @@ const Leaderboard = () => {
                 {user.currentStreak}d
               </div>
             ) : (
-              <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0d</span>
+              <span className="text-xs text-gray-400 dark:text-gray-300 px-2 py-1 bg-gray-50 dark:bg-[#0a0a0a] rounded-full border border-gray-200 dark:border-gray-700">0d</span>
             )}
           </div>
           
@@ -1389,12 +1451,20 @@ const Leaderboard = () => {
             {getConsistencyBadge(user.consistency)}
           </div>
           
-          {/* Masjid Percentage */}
+          {/* Masjid Percentage - only show for users not in masjid mode */}
+          {!user.masjidMode && (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-xs text-gray-400 font-medium">Masjid</span>
+              {user.masjidPercentage > 0 ? getMasjidBadge(user.masjidPercentage) : (
+                <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0%</span>
+              )}
+            </div>
+          )}
+          
+          {/* Last Tracked */}
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-xs text-gray-400 font-medium">Masjid</span>
-            {user.masjidPercentage > 0 ? getMasjidBadge(user.masjidPercentage) : (
-              <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 rounded-full border">0%</span>
-            )}
+            <span className="text-xs text-gray-400 font-medium">Last</span>
+            {getLastTrackedBadge(user.daysSinceLastActivity)}
           </div>
         </div>
       )}
@@ -1464,28 +1534,28 @@ const Leaderboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Notification */}
       {notification && (
         <div className={`fixed top-4 right-2 sm:right-4 left-2 sm:left-auto z-50 px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg border transition-all duration-300 text-sm sm:text-base ${
           notification.type === 'success' 
-            ? 'bg-green-50 border-green-200 text-green-800' 
-            : 'bg-red-50 border-red-200 text-red-800'
+            ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900 dark:border-green-800 dark:text-green-200' 
+            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900 dark:border-red-800 dark:text-red-200'
         }`}>
           <div className="flex items-center gap-2">
             {notification.type === 'success' ? (
-              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-green-500 flex items-center justify-center">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-green-500 flex items-center justify-center dark:bg-green-700">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full dark:bg-black"></div>
               </div>
             ) : (
-              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 flex items-center justify-center">
-                <div className="w-2.5 h-0.5 sm:w-3 sm:h-0.5 bg-white rounded"></div>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 flex items-center justify-center dark:bg-red-700">
+                <div className="w-2.5 h-0.5 sm:w-3 sm:h-0.5 bg-white rounded dark:bg-black"></div>
               </div>
             )}
             <span className="font-medium flex-1">{notification.message}</span>
             <button 
               onClick={() => setNotification(null)}
-              className="ml-2 text-gray-400 hover:text-gray-600 text-lg sm:text-xl"
+              className="ml-2 text-gray-400 hover:text-gray-600 text-lg sm:text-xl dark:text-gray-300 dark:hover:text-gray-100"
             >
               ×
             </button>
@@ -1503,7 +1573,7 @@ const Leaderboard = () => {
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100">
+      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-purple-100 dark:bg-black dark:border-gray-800">
         <div className="flex flex-col gap-4 items-start justify-between">
           {/* Tab Selection */}
           <div className="flex flex-wrap gap-1 sm:gap-2 w-full">
@@ -1511,8 +1581,8 @@ const Leaderboard = () => {
               onClick={() => setActiveTab('global')}
               className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'global'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary-600 text-white dark:bg-primary-800 dark:text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-[#0a0a0a] dark:text-gray-200 dark:hover:bg-[#111]'
               }`}
             >
               <Globe className="w-4 h-4 flex-shrink-0" />
@@ -1523,8 +1593,8 @@ const Leaderboard = () => {
               onClick={() => setActiveTab('friends')}
               className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'friends'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary-600 text-white dark:bg-primary-800 dark:text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-[#0a0a0a] dark:text-gray-200 dark:hover:bg-[#111]'
               }`}
             >
               <Users className="w-4 h-4 flex-shrink-0" />
@@ -1535,15 +1605,15 @@ const Leaderboard = () => {
               onClick={() => setActiveTab('requests')}
               className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition-colors relative text-sm sm:text-base flex-1 sm:flex-none min-w-0 ${
                 activeTab === 'requests'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary-600 text-white dark:bg-primary-800 dark:text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-[#0a0a0a] dark:text-gray-200 dark:hover:bg-[#111]'
               }`}
             >
               <Star className="w-4 h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Requests</span>
               <span className="sm:hidden truncate">Requests</span>
               {friendRequestsReceived.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center dark:bg-red-700">
                   {friendRequestsReceived.length}
                 </span>
               )}
@@ -1554,27 +1624,37 @@ const Leaderboard = () => {
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             {/* Time Period Filter */}
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-500" />
+              <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-300" />
               <select
                 value={timePeriod}
-                onChange={(e) => setTimePeriod(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                onChange={(e) => {
+                  setTimePeriod(e.target.value);
+                  if (currentUser) {
+                    localStorage.setItem(`leaderboard_timePeriod_${currentUser.uid}`, e.target.value);
+                  }
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm dark:bg-black dark:text-gray-200 dark:border-gray-700"
               >
+                <option value="all">All Time</option>
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
                 <option value="year">This Year</option>
-                <option value="all">All Time</option>
               </select>
             </div>
             
             {/* Masjid Mode Filter - Only show for Global tab */}
             {activeTab === 'global' && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 font-medium">Prayer Mode:</span>
+                <span className="text-sm text-gray-600 font-medium dark:text-gray-300">Prayer Mode:</span>
                 <select
                   value={masjidModeFilter}
-                  onChange={(e) => setMasjidModeFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  onChange={(e) => {
+                    setMasjidModeFilter(e.target.value);
+                    if (currentUser) {
+                      localStorage.setItem(`leaderboard_masjidModeFilter_${currentUser.uid}`, e.target.value);
+                    }
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm dark:bg-black dark:text-gray-200 dark:border-gray-700"
                 >
                   <option value="all">All Users</option>
                   <option value="off">Standard Mode</option>
@@ -1587,11 +1667,11 @@ const Leaderboard = () => {
 
         {/* Add Friend Section */}
         {activeTab === 'friends' && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             {!showAddFriend ? (
               <button
                 onClick={() => setShowAddFriend(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors dark:bg-green-800 dark:hover:bg-green-900"
               >
                 <UserPlus className="w-4 h-4" />
                 Add Friend
@@ -1608,7 +1688,7 @@ const Leaderboard = () => {
                       searchUsers(e.target.value);
                     }}
                     placeholder="Search for friends by nickname..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-black dark:text-gray-200 dark:border-gray-700"
                   />
                   <button
                     onClick={() => {
@@ -1616,7 +1696,7 @@ const Leaderboard = () => {
                       setAddFriendInput('');
                       setSearchResults([]);
                     }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-300 dark:hover:bg-[#111]"
                   >
                     Cancel
                   </button>
@@ -1624,7 +1704,7 @@ const Leaderboard = () => {
                 
                 {/* Search Results */}
                 {addFriendInput.trim() && (
-                  <div className="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto">
+                  <div className="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto dark:bg-[#0a0a0a]">
                     {searchLoading ? (
                       <div className="text-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto"></div>
@@ -1634,7 +1714,7 @@ const Leaderboard = () => {
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Found Users:</h4>
                         {searchResults.map(user => (
-                          <div key={user.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-white rounded-lg border dark:bg-[#0a0a0a] dark:border-gray-800">
                             <div className="flex items-center gap-3">
                               {getProfileIcon(user.nickname)}
                               <div>
@@ -1649,8 +1729,8 @@ const Leaderboard = () => {
                               onClick={() => sendFriendRequest(user)}
                               className={`px-3 py-1 text-white text-sm rounded-lg transition-colors flex items-center gap-1 ${
                                 friendRequestsSent.includes(user.id) 
-                                  ? 'bg-gray-500 cursor-not-allowed' 
-                                  : 'bg-green-600 hover:bg-green-700'
+                                  ? 'bg-gray-500 cursor-not-allowed dark:bg-gray-600' 
+                                  : 'bg-green-600 hover:bg-green-700 dark:bg-green-800 dark:hover:bg-green-900'
                               }`}
                               disabled={friendRequestsSent.includes(user.id)}
                             >
@@ -1661,10 +1741,9 @@ const Leaderboard = () => {
                         ))}
                       </div>
                     ) : addFriendInput.trim() ? (
-                      <div className="text-center py-4 text-gray-500">
-                        <Search className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                        <p className="text-sm">No users found with nickname "{addFriendInput}"</p>
-                        <p className="text-xs mt-1">Try searching with a different nickname</p>
+                      <div className="text-center py-6">
+                        <Search className="w-6 h-6 mx-auto text-gray-400 mb-2 dark:text-gray-300" />
+                        <p className="text-gray-600">No users found. Try a different nickname.</p>
                       </div>
                     ) : null}
                   </div>
@@ -1677,14 +1756,14 @@ const Leaderboard = () => {
 
       {/* Current User Stats (if not in top list) */}
       {currentUserStats && currentUserRank && currentUserRank > 100 && (
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 dark:border-gray-800">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Ranking</h3>
           {renderLeaderboardItem(currentUserStats, currentUserRank, true)}
         </div>
       )}
 
       {/* Leaderboard */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-800">
             {activeTab === 'global' ? 'Global Rankings' : 'Friends Rankings'} - {formatTimePeriod(timePeriod)}
@@ -1704,13 +1783,8 @@ const Leaderboard = () => {
                 (() => {
                   // Separate active and inactive users for display
                   const getActivityThreshold = () => {
-                    switch (timePeriod) {
-                      case 'week': return { minDays: 3, inactiveDays: 7 };
-                      case 'month': return { minDays: 7, inactiveDays: 14 };
-                      case 'year': return { minDays: 30, inactiveDays: 30 };
-                      case 'all': return { minDays: 14, inactiveDays: 30 };
-                      default: return { minDays: 7, inactiveDays: 14 };
-                    }
+                    // Always use consistent all-time criteria regardless of current filter
+                    return { minDays: 7, inactiveDays: 14 };
                   };
 
                   const { minDays, inactiveDays } = getActivityThreshold();
@@ -1719,7 +1793,11 @@ const Leaderboard = () => {
                   let currentRank = 1;
 
                   leaderboardData.forEach(user => {
-                    const isActive = user.totalDays >= minDays && user.daysSinceLastActivity <= inactiveDays;
+                    // Prefer previously computed all-time activity, fallback to all-time totals if present
+                    const allTimeDays = (user.allTimeTotalDays !== undefined) ? user.allTimeTotalDays : user.totalDays;
+                    const isActive = (user.isActiveUser !== undefined)
+                      ? user.isActiveUser
+                      : (allTimeDays >= minDays && user.daysSinceLastActivity <= inactiveDays);
                     if (isActive) {
                       activeUsers.push({ ...user, displayRank: currentRank++ });
                     } else {
@@ -1743,7 +1821,7 @@ const Leaderboard = () => {
                             {activeUsers.map(user => {
                               const isCurrentUser = user.id === currentUser.uid;
                               const canAddFriend = !isCurrentUser && !userFriends.includes(user.nickname);
-                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend);
+                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend, !user.isActiveUser);
                             })}
                           </div>
                         </div>
@@ -1766,7 +1844,7 @@ const Leaderboard = () => {
                             {inactiveUsers.map(user => {
                               const isCurrentUser = user.id === currentUser.uid;
                               const canAddFriend = !isCurrentUser && !userFriends.includes(user.nickname);
-                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend, true);
+                              return renderLeaderboardItem(user, user.displayRank, isCurrentUser, canAddFriend, !user.isActiveUser);
                             })}
                           </div>
                         </div>
@@ -1831,7 +1909,7 @@ const Leaderboard = () => {
                         
                         {/* Competitive Metrics Row - Always show for users with data */}
                         {friend.totalDays > 0 && (
-                          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-purple-100 dark:border-gray-800">
                             <div className="flex items-center gap-2 flex-wrap">
                               {/* Always show streak (0 if no streak) */}
                               <div className="flex items-center gap-1">
@@ -1849,12 +1927,20 @@ const Leaderboard = () => {
                                 )}
                               </div>
                               
-                              {/* Always show masjid percentage */}
+                              {/* Show masjid percentage only for users not in masjid mode */}
+                              {!friend.masjidMode && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-gray-500">Masjid:</span>
+                                  {friend.masjidPercentage > 0 ? getMasjidBadge(friend.masjidPercentage) : (
+                                    <span className="text-xs text-gray-400">0%</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Last Tracked */}
                               <div className="flex items-center gap-1">
-                                <span className="text-xs text-gray-500">Masjid:</span>
-                                {friend.masjidPercentage > 0 ? getMasjidBadge(friend.masjidPercentage) : (
-                                  <span className="text-xs text-gray-400">0%</span>
-                                )}
+                                <span className="text-xs text-gray-500">Last:</span>
+                                {getLastTrackedBadge(friend.daysSinceLastActivity)}
                               </div>
                               
                               {/* Show best streak only if significantly higher than current */}

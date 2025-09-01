@@ -327,6 +327,26 @@ export const getRecentStats = async (userId, days = 30, masjidMode = false) => {
   return calculatePrayerStats(prayerData, masjidMode);
 };
 
+// Get all time statistics (all historical data)
+export const getAllTimeStats = async (userId, masjidMode = false) => {
+  try {
+    // Fetch all prayer documents for this user without date restrictions
+    const prayersRef = collection(db, 'users', userId, 'prayers');
+    const querySnapshot = await getDocs(prayersRef);
+    
+    const allPrayerData = {};
+    querySnapshot.forEach((doc) => {
+      allPrayerData[doc.id] = doc.data();
+    });
+    
+    return calculatePrayerStats(allPrayerData, masjidMode);
+  } catch (error) {
+    console.error('Error fetching all time stats:', error);
+    // Fallback to empty stats if error occurs
+    return calculatePrayerStats({}, masjidMode);
+  }
+};
+
 // Get motivational insights
 export const getMotivationalInsights = (stats) => {
   const insights = [];

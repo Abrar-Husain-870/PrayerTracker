@@ -32,9 +32,11 @@ import {
   getMonthlyStats, 
   getYearlyStats, 
   getRecentStats,
+  getAllTimeStats,
   getMotivationalInsights 
 } from '../services/analyticsService';
 import { PRAYER_STATUS, PRAYER_COLORS } from '../services/prayerService';
+import { useTheme } from '../contexts/ThemeContext';
 
 ChartJS.register(
   CategoryScale,
@@ -48,13 +50,29 @@ ChartJS.register(
 
 const Progress = () => {
   const { currentUser } = useAuth();
-  const [timeframe, setTimeframe] = useState('month'); // 'month', 'year', 'recent'
+  const { resolvedTheme } = useTheme();
+  const [timeframe, setTimeframe] = useState('alltime'); // Default to 'alltime'
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(false);
   const [masjidMode, setMasjidMode] = useState(false);
+
+  // Load user preferences from localStorage
+  useEffect(() => {
+    if (currentUser) {
+      const savedTimeframe = localStorage.getItem(`progress_timeframe_${currentUser.uid}`);
+      if (savedTimeframe) {
+        setTimeframe(savedTimeframe);
+      }
+      
+      const savedMonth = localStorage.getItem(`progress_month_${currentUser.uid}`);
+      const savedYear = localStorage.getItem(`progress_year_${currentUser.uid}`);
+      if (savedMonth) setSelectedMonth(parseInt(savedMonth));
+      if (savedYear) setSelectedYear(parseInt(savedYear));
+    }
+  }, [currentUser]);
 
   // Fetch user's Masjid Mode setting
   useEffect(() => {
@@ -95,6 +113,9 @@ const Progress = () => {
           break;
         case 'recent':
           statsData = await getRecentStats(currentUser.uid, 30, masjidMode);
+          break;
+        case 'alltime':
+          statsData = await getAllTimeStats(currentUser.uid, masjidMode);
           break;
         default:
           statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth, masjidMode);
@@ -140,6 +161,8 @@ const Progress = () => {
   };
 
   // Prepare chart data
+  const isDark = resolvedTheme === 'dark';
+  const pieBorderColor = isDark ? '#0a0a0a' : '#ffffff';
   const prayerBreakdownData = stats ? {
     labels: ['Masjid', 'Home', 'Qaza', 'Not Prayed'],
     datasets: [
@@ -157,7 +180,8 @@ const Progress = () => {
           PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
         ],
         borderWidth: 2,
-        borderColor: '#ffffff',
+        borderColor: pieBorderColor,
+        hoverBorderWidth: 2,
       },
     ],
   } : null;
@@ -214,6 +238,11 @@ const Progress = () => {
         }
       }
     },
+    elements: {
+      arc: {
+        borderWidth: 2,
+      }
+    }
   };
 
   const getTimeframeLabel = () => {
@@ -224,6 +253,8 @@ const Progress = () => {
         return `${selectedYear}`;
       case 'recent':
         return 'Last 30 Days';
+      case 'alltime':
+        return 'All Time';
       default:
         return '';
     }
@@ -255,16 +286,22 @@ const Progress = () => {
         <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
           <div className="flex gap-1 sm:gap-2 w-full sm:w-auto">
             {[
+              { key: 'alltime', label: 'All Time', shortLabel: 'All' },
               { key: 'recent', label: 'Last 30 Days', shortLabel: '30D' },
               { key: 'month', label: 'Monthly', shortLabel: 'Month' },
               { key: 'year', label: 'Yearly', shortLabel: 'Year' }
             ].map(option => (
               <button
                 key={option.key}
-                onClick={() => setTimeframe(option.key)}
+                onClick={() => {
+                  setTimeframe(option.key);
+                  if (currentUser) {
+                    localStorage.setItem(`progress_timeframe_${currentUser.uid}`, option.key);
+                  }
+                }}
                 className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm flex-1 sm:flex-none ${
                   timeframe === option.key
-                    ? 'bg-white text-primary-700'
+                    ? 'bg-white text-primary-700 dark:bg-primary-700 dark:text-white dark:border dark:border-primary-600'
                     : 'bg-primary-500 text-white hover:bg-primary-400'
                 }`}
               >
@@ -278,8 +315,14 @@ const Progress = () => {
             <div className="flex gap-2">
               <select
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400"
+                onChange={(e) => {
+                  const month = parseInt(e.target.value);
+                  setSelectedMonth(month);
+                  if (currentUser) {
+                    localStorage.setItem(`progress_month_${currentUser.uid}`, month.toString());
+                  }
+                }}
+                className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400 dark:bg-black dark:text-gray-200 dark:border-gray-700"
               >
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>
@@ -289,8 +332,14 @@ const Progress = () => {
               </select>
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400"
+                onChange={(e) => {
+                  const year = parseInt(e.target.value);
+                  setSelectedYear(year);
+                  if (currentUser) {
+                    localStorage.setItem(`progress_year_${currentUser.uid}`, year.toString());
+                  }
+                }}
+                className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400 dark:bg-black dark:text-gray-200 dark:border-gray-700"
               >
                 {Array.from({ length: 5 }, (_, i) => (
                   <option key={2024 + i} value={2024 + i}>
@@ -304,8 +353,14 @@ const Progress = () => {
           {timeframe === 'year' && (
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400"
+              onChange={(e) => {
+                const year = parseInt(e.target.value);
+                setSelectedYear(year);
+                if (currentUser) {
+                  localStorage.setItem(`progress_year_${currentUser.uid}`, year.toString());
+                }
+              }}
+              className="bg-primary-500 text-white rounded-lg px-3 py-2 border border-primary-400 dark:bg-black dark:text-gray-200 dark:border-gray-700"
             >
               {Array.from({ length: 5 }, (_, i) => (
                 <option key={2024 + i} value={2024 + i}>
@@ -325,7 +380,7 @@ const Progress = () => {
         <>
           {/* Key Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Days Tracked</p>
@@ -335,7 +390,7 @@ const Progress = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Consistency</p>
@@ -345,7 +400,7 @@ const Progress = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Current Streak</p>
@@ -356,7 +411,7 @@ const Progress = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Best Streak</p>
@@ -367,7 +422,7 @@ const Progress = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 col-span-2 md:col-span-1">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 col-span-2 md:col-span-1 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Average Score</p>
@@ -380,14 +435,14 @@ const Progress = () => {
 
           {/* Surah Al-Kahf Friday Tracking */}
           {stats.surahAlKahfStats.totalFridays > 0 && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-purple-200">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-purple-200 dark:from-black dark:to-black dark:border-gray-800">
               <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
                 <Book className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                 Surah Al-Kahf (Friday Special)
               </h3>
               
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
-                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100 dark:bg-[#0a0a0a] dark:border-gray-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-600 text-xs sm:text-sm font-medium">Total Fridays</p>
@@ -397,7 +452,7 @@ const Progress = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100 dark:bg-[#0a0a0a] dark:border-gray-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-600 text-xs sm:text-sm font-medium">Recited</p>
@@ -407,7 +462,7 @@ const Progress = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100 dark:bg-[#0a0a0a] dark:border-gray-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-600 text-xs sm:text-sm font-medium">Missed</p>
@@ -417,7 +472,7 @@ const Progress = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100 dark:bg-[#0a0a0a] dark:border-gray-800">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-600 text-xs sm:text-sm font-medium">Consistency</p>
@@ -429,14 +484,14 @@ const Progress = () => {
               </div>
               
               {/* Surah Al-Kahf Progress Bar */}
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100">
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-100 dark:bg-[#0a0a0a] dark:border-gray-800 glass-card">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700">Friday Reading Progress</span>
                   <span className="text-sm text-gray-600">
                     {stats.surahAlKahfStats.recited} / {stats.surahAlKahfStats.totalFridays} Fridays
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-800">
                   <div 
                     className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300"
                     style={{ 
@@ -459,14 +514,14 @@ const Progress = () => {
 
           {/* Motivational Insights */}
           {insights.length > 0 && (
-            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6">
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 dark:from-black dark:to-black">
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <Star className="w-6 h-6 text-yellow-500" />
                 Your Achievements & Insights
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights.map((insight, index) => (
-                  <div key={index} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+                  <div key={index} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 dark:bg-[#0a0a0a] dark:border-gray-800">
                     <div className="flex items-start gap-3">
                       {getInsightIcon(insight.type)}
                       <div>
@@ -483,7 +538,7 @@ const Progress = () => {
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Prayer Breakdown Pie Chart */}
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Prayer Status Breakdown</h3>
               {prayerBreakdownData && stats.totalPrayers > 0 ? (
                 <Pie data={prayerBreakdownData} options={pieOptions} />
@@ -498,7 +553,7 @@ const Progress = () => {
             </div>
 
             {/* Prayer Type Bar Chart */}
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Prayer-wise Performance</h3>
               {prayerTypeData && stats.totalPrayers > 0 ? (
                 <Bar data={prayerTypeData} options={chartOptions} />
@@ -514,7 +569,7 @@ const Progress = () => {
           </div>
 
           {/* Detailed Breakdown */}
-          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
             <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 sm:mb-6">Detailed Statistics</h3>
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {Object.entries(stats.prayerBreakdown).map(([status, count]) => {

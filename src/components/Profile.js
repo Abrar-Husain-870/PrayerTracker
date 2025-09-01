@@ -285,7 +285,7 @@ const [userToDelete, setUserToDelete] = useState(null);
       </div>
 
       {/* User Information */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <User className="w-5 h-5" />
           User Information
@@ -443,7 +443,7 @@ const [userToDelete, setUserToDelete] = useState(null);
       <RefreshAppButton />
 
       {/* Data Management */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <Database className="w-5 h-5" />
           Data Management
@@ -476,7 +476,7 @@ const [userToDelete, setUserToDelete] = useState(null);
       </div>
 
       {/* Account Actions */}
-      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" />
           Account Actions

@@ -28,14 +28,14 @@ const Rules = () => {
   };
 
   const SectionCard = ({ id, title, icon: Icon, children, isExpanded }) => (
-    <div className="bg-white rounded-xl shadow-lg border border-rose-100 overflow-hidden">
+    <div className="bg-white dark:bg-black rounded-xl shadow-lg border border-rose-100 dark:border-gray-800 overflow-hidden">
       <button
         onClick={() => toggleSection(id)}
-        className="w-full px-6 py-4 bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 transition-colors duration-200 flex items-center justify-between"
+        className="w-full px-6 py-4 bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 dark:from-black dark:to-black dark:hover:from-[#0a0a0a] dark:hover:to-[#0a0a0a] transition-colors duration-200 flex items-center justify-between"
       >
         <div className="flex items-center space-x-3">
           <Icon className="w-6 h-6 text-rose-600" />
-          <h2 className="text-xl font-bold text-rose-800">{title}</h2>
+          <h2 className="text-xl font-bold text-rose-800 dark:text-rose-200">{title}</h2>
         </div>
         {isExpanded ? (
           <ChevronDown className="w-5 h-5 text-rose-600" />
@@ -52,13 +52,13 @@ const Rules = () => {
   );
 
   const FormulaBox = ({ title, formula, example }) => (
-    <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-lg p-4 border border-rose-200">
-      <h4 className="font-semibold text-rose-800 mb-2">{title}</h4>
-      <div className="bg-white rounded p-3 mb-3 border border-rose-100">
-        <code className="text-rose-700 font-mono text-sm">{formula}</code>
+    <div className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-black dark:to-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
+      <h4 className="font-semibold text-rose-800 dark:text-rose-200 mb-2">{title}</h4>
+      <div className="bg-white dark:bg-black rounded p-3 mb-3 border border-rose-100 dark:border-gray-800">
+        <code className="text-rose-700 dark:text-rose-300 font-mono text-sm">{formula}</code>
       </div>
       {example && (
-        <div className="text-sm text-rose-600">
+        <div className="text-sm text-rose-600 dark:text-rose-300">
           <strong>Example:</strong> {example}
         </div>
       )}
@@ -66,35 +66,35 @@ const Rules = () => {
   );
 
   const ScoreCard = ({ status, standardScore, masjidScore, icon: Icon, description }) => (
-    <div className="bg-white rounded-lg p-4 border border-rose-200 hover:border-rose-300 transition-colors">
+    <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800 hover:border-rose-300 dark:hover:border-gray-700 transition-colors">
       <div className="flex items-center space-x-3 mb-2">
         <Icon className="w-5 h-5 text-rose-600" />
-        <h4 className="font-semibold text-rose-800">{status}</h4>
+        <h4 className="font-semibold text-rose-800 dark:text-rose-200">{status}</h4>
       </div>
-      <p className="text-sm text-gray-600 mb-3">{description}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{description}</p>
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-rose-50 rounded p-2">
-          <div className="text-xs text-rose-600 font-medium">Standard Mode</div>
-          <div className="text-lg font-bold text-rose-800">{standardScore} pts</div>
+        <div className="bg-rose-50 dark:bg-[#0a0a0a] rounded p-2">
+          <div className="text-xs text-rose-600 dark:text-rose-300 font-medium">Standard Mode</div>
+          <div className="text-lg font-bold text-rose-800 dark:text-rose-200">{standardScore} pts</div>
         </div>
-        <div className="bg-pink-50 rounded p-2">
-          <div className="text-xs text-pink-600 font-medium">Home Mode</div>
-          <div className="text-lg font-bold text-pink-800">{masjidScore} pts</div>
+        <div className="bg-pink-50 dark:bg-[#0a0a0a] rounded p-2">
+          <div className="text-xs text-pink-600 dark:text-pink-300 font-medium">Home Mode</div>
+          <div className="text-lg font-bold text-pink-800 dark:text-pink-200">{masjidScore} pts</div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-red-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-red-50 dark:from-black dark:via-black dark:to-black p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full mb-4">
             <BookOpen className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-rose-800 mb-2">Rules & Guide</h1>
-          <p className="text-rose-600 text-lg">
+          <h1 className="text-4xl font-bold text-rose-800 dark:text-rose-200 mb-2">Rules & Guide</h1>
+          <p className="text-rose-600 dark:text-rose-300 text-lg">
             Everything you need to know about Namaaz Tracker
           </p>
         </div>
@@ -108,7 +108,7 @@ const Rules = () => {
             isExpanded={expandedSection === 'scoring'}
           >
             <div className="space-y-4">
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 Namaaz Tracker uses a point-based system to track your prayer consistency. 
                 The scoring varies based on your <strong>Prayer Mode</strong> setting.
               </p>
@@ -144,12 +144,12 @@ const Rules = () => {
                 />
               </div>
 
-              <div className="bg-rose-100 rounded-lg p-4 border border-rose-200">
+              <div className="bg-rose-100 dark:bg-[#0a0a0a] rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                 <div className="flex items-start space-x-3">
                   <Info className="w-5 h-5 text-rose-600 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-rose-800 mb-1">Why Different Scoring?</h4>
-                    <p className="text-rose-700 text-sm">
+                    <h4 className="font-semibold text-rose-800 dark:text-rose-200 mb-1">Why Different Scoring?</h4>
+                    <p className="text-rose-700 dark:text-rose-300 text-sm">
                       <strong>Standard Mode:</strong> Rewards mosque attendance with higher points (27 vs 1 for home).<br/>
                       <strong>Home Mode:</strong> Treats all on-time prayers equally (27 pts), perfect for those who primarily pray at home.
                     </p>
@@ -214,27 +214,27 @@ const Rules = () => {
           >
             <div className="space-y-6">
               <div className="space-y-4">
-                <div className="bg-white rounded-lg p-4 border border-rose-200">
+                <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <div className="flex items-center space-x-3 mb-3">
                     <Building className="w-5 h-5 text-rose-600" />
-                    <h4 className="font-semibold text-rose-800">Masjid Mode Toggle</h4>
+                    <h4 className="font-semibold text-rose-800 dark:text-rose-200">Masjid Mode Toggle</h4>
                   </div>
-                  <p className="text-gray-700 mb-3">
+                  <p className="text-gray-700 dark:text-gray-300 mb-3">
                     <strong>Location:</strong> Profile → Settings<br/>
                     <strong>Default:</strong> OFF (Standard Mode)
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-rose-50 rounded p-3">
-                      <h5 className="font-medium text-rose-800 mb-1">Standard Mode (OFF)</h5>
-                      <p className="text-sm text-rose-700">
+                    <div className="bg-rose-50 dark:bg-[#0a0a0a] rounded p-3">
+                      <h5 className="font-medium text-rose-800 dark:text-rose-200 mb-1">Standard Mode (OFF)</h5>
+                      <p className="text-sm text-rose-700 dark:text-rose-300">
                         • Shows "Home" and "Masjid" options<br/>
                         • Rewards mosque attendance highly<br/>
                         • Best for regular mosque-goers
                       </p>
                     </div>
-                    <div className="bg-pink-50 rounded p-3">
-                      <h5 className="font-medium text-pink-800 mb-1">Home Mode (ON)</h5>
-                      <p className="text-sm text-pink-700">
+                    <div className="bg-pink-50 dark:bg-[#0a0a0a] rounded p-3">
+                      <h5 className="font-medium text-pink-800 dark:text-pink-200 mb-1">Home Mode (ON)</h5>
+                      <p className="text-sm text-pink-700 dark:text-pink-300">
                         • Shows only "Prayed" option<br/>
                         • Equal points for all on-time prayers<br/>
                         • Best for home prayer preference
@@ -243,27 +243,27 @@ const Rules = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 border border-rose-200">
+                <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <div className="flex items-center space-x-3 mb-3">
                     <Eye className="w-5 h-5 text-rose-600" />
-                    <h4 className="font-semibold text-rose-800">Privacy Toggle</h4>
+                    <h4 className="font-semibold text-rose-800 dark:text-rose-200">Privacy Toggle</h4>
                   </div>
-                  <p className="text-gray-700 mb-3">
+                  <p className="text-gray-700 dark:text-gray-300 mb-3">
                     <strong>Location:</strong> Profile → Settings<br/>
                     <strong>Default:</strong> ON (Public)
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-rose-50 rounded p-3">
-                      <h5 className="font-medium text-rose-800 mb-1">Public (ON)</h5>
-                      <p className="text-sm text-rose-700">
+                    <div className="bg-rose-50 dark:bg-[#0a0a0a] rounded p-3">
+                      <h5 className="font-medium text-rose-800 dark:text-rose-200 mb-1">Public (ON)</h5>
+                      <p className="text-sm text-rose-700 dark:text-rose-300">
                         • Visible on leaderboards<br/>
                         • Others can add you as friend<br/>
                         • Participate in community features
                       </p>
                     </div>
-                    <div className="bg-pink-50 rounded p-3">
-                      <h5 className="font-medium text-pink-800 mb-1">Private (OFF)</h5>
-                      <p className="text-sm text-pink-700">
+                    <div className="bg-pink-50 dark:bg-[#0a0a0a] rounded p-3">
+                      <h5 className="font-medium text-pink-800 dark:text-pink-200 mb-1">Private (OFF)</h5>
+                      <p className="text-sm text-pink-700 dark:text-pink-300">
                         • Hidden from leaderboards<br/>
                         • Personal tracking only<br/>
                         • Complete privacy
@@ -285,12 +285,12 @@ const Rules = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="bg-white rounded-lg p-4 border border-rose-200">
+                  <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                     <div className="flex items-center space-x-3 mb-3">
                       <Calendar className="w-5 h-5 text-rose-600" />
-                      <h4 className="font-semibold text-rose-800">1. Track Daily Prayers</h4>
+                      <h4 className="font-semibold text-rose-800 dark:text-rose-200">1. Track Daily Prayers</h4>
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
                       • Go to Calendar section<br/>
                       • Click on any date<br/>
                       • Mark each prayer status<br/>
@@ -298,12 +298,12 @@ const Rules = () => {
                     </p>
                   </div>
 
-                  <div className="bg-white rounded-lg p-4 border border-rose-200">
+                  <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                     <div className="flex items-center space-x-3 mb-3">
                       <TrendingUp className="w-5 h-5 text-rose-600" />
-                      <h4 className="font-semibold text-rose-800">2. Monitor Progress</h4>
+                      <h4 className="font-semibold text-rose-800 dark:text-rose-200">2. Monitor Progress</h4>
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
                       • Visit Progress section<br/>
                       • View different time periods<br/>
                       • Analyze your statistics<br/>
@@ -313,12 +313,12 @@ const Rules = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="bg-white rounded-lg p-4 border border-rose-200">
+                  <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                     <div className="flex items-center space-x-3 mb-3">
                       <Users className="w-5 h-5 text-rose-600" />
-                      <h4 className="font-semibold text-rose-800">3. Join Leaderboards</h4>
+                      <h4 className="font-semibold text-rose-800 dark:text-rose-200">3. Join Leaderboards</h4>
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
                       • Enable Public profile<br/>
                       • Compete with others<br/>
                       • Add friends<br/>
@@ -326,12 +326,12 @@ const Rules = () => {
                     </p>
                   </div>
 
-                  <div className="bg-white rounded-lg p-4 border border-rose-200">
+                  <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                     <div className="flex items-center space-x-3 mb-3">
                       <Settings className="w-5 h-5 text-rose-600" />
-                      <h4 className="font-semibold text-rose-800">4. Customize Settings</h4>
+                      <h4 className="font-semibold text-rose-800 dark:text-rose-200">4. Customize Settings</h4>
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
                       • Set your prayer mode<br/>
                       • Adjust privacy settings<br/>
                       • Personalize your experience<br/>
@@ -341,12 +341,12 @@ const Rules = () => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-rose-100 to-pink-100 rounded-lg p-6 border border-rose-200">
+              <div className="bg-gradient-to-r from-rose-100 to-pink-100 dark:from-[#0a0a0a] dark:to-[#0a0a0a] rounded-lg p-6 border border-rose-200 dark:border-gray-800">
                 <div className="flex items-start space-x-3">
                   <Star className="w-6 h-6 text-rose-600 mt-1" />
                   <div>
-                    <h4 className="font-bold text-rose-800 mb-2">Pro Tips for Success</h4>
-                    <ul className="text-rose-700 space-y-1 text-sm">
+                    <h4 className="font-bold text-rose-800 dark:text-rose-200 mb-2">Pro Tips for Success</h4>
+                    <ul className="text-rose-700 dark:text-rose-300 space-y-1 text-sm">
                       <li>• Set your Masjid Mode based on your primary prayer location</li>
                       <li>• Track consistently for accurate statistics</li>
                       <li>• Use the Progress section to identify improvement areas</li>
@@ -367,14 +367,14 @@ const Rules = () => {
             isExpanded={expandedSection === 'leaderboard'}
           >
             <div className="space-y-4">
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 The leaderboard ensures fair competition by separating users based on their prayer modes and calculating composite scores.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white rounded-lg p-4 border border-rose-200">
+                <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <h4 className="font-semibold text-rose-800 mb-2">Filter Options</h4>
-                  <ul className="text-sm text-gray-700 space-y-1">
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                     <li>• All Users</li>
                     <li>• Standard Mode Only</li>
                     <li>• Home Mode Only</li>
@@ -382,9 +382,9 @@ const Rules = () => {
                   </ul>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 border border-rose-200">
+                <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <h4 className="font-semibold text-rose-800 mb-2">Time Periods</h4>
-                  <ul className="text-sm text-gray-700 space-y-1">
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                     <li>• This Week</li>
                     <li>• This Month</li>
                     <li>• This Year</li>
@@ -392,9 +392,9 @@ const Rules = () => {
                   </ul>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 border border-rose-200">
+                <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <h4 className="font-semibold text-rose-800 mb-2">Ranking Factors</h4>
-                  <ul className="text-sm text-gray-700 space-y-1">
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                     <li>• Average Score (50%)</li>
                     <li>• Consistency (30%)</li>
                     <li>• Streak (15%)</li>

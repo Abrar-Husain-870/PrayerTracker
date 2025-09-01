@@ -45,12 +45,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 dark:from-black dark:to-black dark:bg-black flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl overflow-hidden border border-purple-100 dark:border-gray-800">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-8 text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-arabic">🕌</span>
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 ring-1 ring-white/30 flex items-center justify-center mx-auto mb-4">
+            <img
+              src="/LogoHeader.png"
+              alt="Jamā’ah Journal Logo"
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
           </div>
           <h1 className="text-2xl font-bold mb-2">Jamā’ah Journal</h1>
           <p className="text-primary-100">Build your spiritual discipline</p>
@@ -64,7 +69,7 @@ const Login = () => {
               className={`flex-1 py-2 px-4 text-center font-medium rounded-l-lg transition-colors ${
                 isLogin 
                   ? 'bg-primary-600 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#0a0a0a] dark:text-gray-300 dark:hover:bg-[#111]'
               }`}
             >
               Login
@@ -74,7 +79,7 @@ const Login = () => {
               className={`flex-1 py-2 px-4 text-center font-medium rounded-r-lg transition-colors ${
                 !isLogin 
                   ? 'bg-primary-600 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#0a0a0a] dark:text-gray-300 dark:hover:bg-[#111]'
               }`}
             >
               Sign Up
@@ -82,7 +87,7 @@ const Login = () => {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm dark:bg-red-900/30 dark:border-red-800 dark:text-red-200">
               {error}
             </div>
           )}
@@ -95,7 +100,7 @@ const Login = () => {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 dark:bg-black dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
               />
             </div>
@@ -109,7 +114,7 @@ const Login = () => {
                   placeholder="Nickname (how others will see you)"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 dark:bg-black dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                   maxLength={20}
                 />
@@ -123,13 +128,13 @@ const Login = () => {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 dark:bg-black dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -138,7 +143,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Create Account')}
             </button>
@@ -147,17 +152,17 @@ const Login = () => {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className="w-full border-t border-gray-300 dark:border-gray-700" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-white dark:bg-[#0a0a0a] text-gray-500 dark:text-gray-300">Or continue with</span>
               </div>
             </div>
 
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="mt-4 w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="mt-4 w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-[#111] text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -169,7 +174,7 @@ const Login = () => {
             </button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
               onClick={() => setIsLogin(!isLogin)}

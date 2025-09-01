@@ -75,14 +75,25 @@ const PrayerCalendar = () => {
       endOfCalendarView.setDate(endOfCalendarView.getDate() + (6 - lastDayOfMonth.getDay()));
 
       let allData = {};
-      let date = new Date(startOfCalendarView);
-      while (date <= endOfCalendarView) {
-        const monthToLoad = date.getMonth() + 1;
-        const yearToLoad = date.getFullYear();
+      
+      // Future-proof month iteration: collect all unique months in calendar view
+      const monthsToLoad = new Set();
+      let tempDate = new Date(startOfCalendarView);
+      
+      // Iterate through each day in calendar view to find all months
+      while (tempDate <= endOfCalendarView) {
+        const monthKey = `${tempDate.getFullYear()}-${tempDate.getMonth() + 1}`;
+        monthsToLoad.add(monthKey);
+        tempDate.setDate(tempDate.getDate() + 1);
+      }
+      
+      // Load data for each unique month
+      for (const monthKey of monthsToLoad) {
+        const [yearStr, monthStr] = monthKey.split('-');
+        const yearToLoad = parseInt(yearStr);
+        const monthToLoad = parseInt(monthStr);
         const monthResult = await getPrayerDataForMonth(currentUser.uid, yearToLoad, monthToLoad);
         allData = { ...allData, ...monthResult };
-        date.setMonth(date.getMonth() + 1);
-        date.setDate(1);
       }
       setMonthData(allData);
     } catch (error) {
@@ -163,7 +174,7 @@ const PrayerCalendar = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-md mx-auto bg-white dark:bg-black rounded-lg shadow-lg overflow-hidden glass-card">
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-3 sm:p-4">
         <h2 className="text-lg sm:text-xl font-semibold text-center">Jamā'ah Journal</h2>
         <p className="text-center text-primary-100 text-xs sm:text-sm mt-1">
@@ -171,7 +182,7 @@ const PrayerCalendar = () => {
         </p>
       </div>
 
-      <div className="p-2 sm:p-4">
+      <div className="p-2 sm:p-4 glass-card">
         <Calendar
           onChange={setSelectedDate}
           onActiveStartDateChange={({ activeStartDate }) => setCurrentMonth(activeStartDate)}
@@ -189,7 +200,7 @@ const PrayerCalendar = () => {
         />
       </div>
 
-      <div className="border-t bg-gray-50 p-3 sm:p-4">
+      <div className="border-t bg-gray-50 dark:bg-black p-3 sm:p-4 glass-card">
         <h3 className="font-semibold text-gray-800 mb-3 text-sm sm:text-base">
           {selectedDate.toLocaleDateString('en-US', { 
             weekday: 'long', 
@@ -204,7 +215,7 @@ const PrayerCalendar = () => {
             const status = selectedDayData ? selectedDayData[prayer] : undefined;
             
             return (
-              <div key={prayer} className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm">
+              <div key={prayer} className="flex items-center justify-between p-2 bg-white dark:bg-black rounded-lg shadow-sm glass-card">
                 <div className="flex items-center gap-3">
                   {status ? (
                     <div 
@@ -220,7 +231,7 @@ const PrayerCalendar = () => {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 flex items-center gap-1">
+                  <span className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1">
                     {status ? (
                       <>
                         {getPrayerIcon(status)}
@@ -234,7 +245,7 @@ const PrayerCalendar = () => {
                   <select
                     value={status || ""}
                     onChange={(e) => handlePrayerStatusChange(prayer, e.target.value)}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="text-sm border border-gray-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
                   >
                     <option value="">-- Select --</option>
                     <option value="clear">Clear</option>
@@ -250,7 +261,7 @@ const PrayerCalendar = () => {
           })}
           
           {isFriday(selectedDate) && (
-            <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg shadow-sm border border-purple-200">
+            <div className="flex items-center justify-between p-2 bg-purple-50 dark:bg-[#0a0a0a] rounded-lg shadow-sm border border-purple-200 dark:border-gray-800 glass-card">
               <div className="flex items-center gap-3">
                 {selectedDayData && selectedDayData[SURAH_ALKAHF] ? (
                   <div 
@@ -285,7 +296,7 @@ const PrayerCalendar = () => {
                 <select
                   value={(selectedDayData && selectedDayData[SURAH_ALKAHF]) || ""}
                   onChange={(e) => handlePrayerStatusChange(SURAH_ALKAHF, e.target.value)}
-                  className="text-sm border border-purple-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="text-sm border border-purple-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
                 >
                   <option value="">-- Select --</option>
                   <option value="clear">Clear</option>
@@ -297,10 +308,10 @@ const PrayerCalendar = () => {
           )}
         </div>
 
-        <div className="mt-4 p-3 bg-primary-50 rounded-lg">
+        <div className="mt-4 p-3 bg-primary-50 dark:bg-[#0a0a0a] rounded-lg border border-transparent dark:border-gray-800 glass-card">
           <div className="flex justify-between items-center">
-            <span className="font-medium text-gray-700">Daily Score:</span>
-            <span className="font-bold text-primary-700">
+            <span className="font-medium text-gray-700 dark:text-gray-200">Daily Score:</span>
+            <span className="font-bold text-primary-700 dark:text-primary-400">
               {(() => {
                 const dayScore = calculateDayScore(selectedDayData, selectedDate, masjidMode);
                 const maxScore = isFriday(selectedDate) ? 145 : 135;
@@ -309,7 +320,7 @@ const PrayerCalendar = () => {
             </span>
           </div>
           {isFriday(selectedDate) && (
-            <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+            <div className="text-xs text-purple-600 dark:text-purple-400 mt-1 flex items-center gap-1">
               <Book className="w-3 h-3" />
               Friday Special: +10 points for Surah Al-Kahf
             </div>
