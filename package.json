@@ -17,9 +17,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "prebuild": "node scripts/update-sw-version.js",
     "build": "react-scripts build",
+    "postbuild": "node scripts/update-sw-version.js",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "update-cache": "node scripts/update-sw-version.js"
   },
   "eslintConfig": {
     "extends": [
