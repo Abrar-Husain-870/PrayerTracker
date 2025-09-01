@@ -57,7 +57,7 @@ function AppContent() {
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center">
                 <img
-                  src="/LogoHeader.png"
+                  src={`${process.env.PUBLIC_URL}/LogoHeader.png`}
                   alt="Jamā'ah Journal Logo"
                   className="w-full h-full object-cover"
                   loading="lazy"

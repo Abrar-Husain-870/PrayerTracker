@@ -51,7 +51,7 @@ const Login = () => {
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-8 text-center">
           <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 ring-1 ring-white/30 flex items-center justify-center mx-auto mb-4">
             <img
-              src="/LogoHeader.png"
+              src={`${process.env.PUBLIC_URL}/LogoHeader.png`}
               alt="Jamā’ah Journal Logo"
               className="w-full h-full object-cover"
               loading="lazy"
