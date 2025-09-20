@@ -319,6 +319,40 @@ const Progress = () => {
   const primaryStroke = isDark ? '#60a5fa' : '#3b82f6'; // blue-500/400
   const primaryFill = isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)';
 
+  // Dynamic Y-axis range based on visible series (smoothed or raw)
+  const valuesForScale = (smooth ? smoothedValues : trendDataValues).filter(v => Number.isFinite(v));
+  let dynMin = trendType === 'average' ? 0 : 0;
+  let dynMax = trendType === 'average' ? 145 : 100;
+  if (valuesForScale.length > 0) {
+    const vmin = Math.min(...valuesForScale);
+    const vmax = Math.max(...valuesForScale);
+    const span = Math.max(1, vmax - vmin);
+    const pad = Math.max(span * 0.12, trendType === 'average' ? 3 : 2);
+    let minY = vmin - pad;
+    let maxY = vmax + pad;
+    if (trendType === 'composite') {
+      minY = Math.max(0, minY);
+      maxY = Math.min(100, maxY);
+      // Ensure we still have some span
+      if (maxY - minY < 10) {
+        const add = (10 - (maxY - minY)) / 2;
+        minY = Math.max(0, minY - add);
+        maxY = Math.min(100, maxY + add);
+      }
+    } else {
+      // Average scores - typical bounds ~0..150
+      minY = Math.max(0, minY);
+      maxY = Math.min(150, maxY);
+      if (maxY - minY < 10) {
+        const add = (10 - (maxY - minY)) / 2;
+        minY = Math.max(0, minY - add);
+        maxY = Math.min(150, maxY + add);
+      }
+    }
+    dynMin = minY;
+    dynMax = maxY;
+  }
+
   const trendData = {
     labels: trendLabels,
     datasets: [
@@ -383,8 +417,9 @@ const Progress = () => {
     },
     scales: {
       y: {
-        beginAtZero: true,
-        suggestedMax: trendType === 'average' ? 145 : 100,
+        beginAtZero: false,
+        min: dynMin,
+        max: dynMax,
         grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
         ticks: { color: isDark ? '#9ca3af' : '#6b7280' }
       },
