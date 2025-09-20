@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  Decimation,
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,7 +51,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  Decimation
 );
 
 const Progress = () => {
@@ -67,6 +69,7 @@ const Progress = () => {
   const [dailyTrend, setDailyTrend] = useState([]);
   const [smooth, setSmooth] = useState(false); // moving average smoothing
   const [zoomReady, setZoomReady] = useState(false); // zoom plugin loaded
+  const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 480 : false);
   const chartRef = useRef(null);
 
   // Load user preferences from localStorage
@@ -128,6 +131,20 @@ const Progress = () => {
       }
     })();
     return () => { mounted = false; };
+  }, []);
+
+  // Update small-screen flag on resize for responsive x-axis label rotation
+  useEffect(() => {
+    const onResize = () => setIsSmallScreen(window.innerWidth < 480);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Update small-screen flag on resize to control x-axis label rotation and density
+  useEffect(() => {
+    const onResize = () => setIsSmallScreen(window.innerWidth < 480);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const loadStats = async () => {
@@ -215,6 +232,7 @@ const Progress = () => {
 
   // Prepare chart data
   const isDark = resolvedTheme === 'dark';
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false;
   const pieBorderColor = isDark ? '#0a0a0a' : '#ffffff';
   const prayerBreakdownData = stats ? {
     labels: ['Masjid', 'Home', 'Qaza', 'Not Prayed'],
@@ -311,8 +329,10 @@ const Progress = () => {
         backgroundColor: primaryFill,
         pointBackgroundColor: primaryStroke,
         pointBorderColor: primaryStroke,
+        pointStyle: 'circle',
         pointRadius: 3,
         pointHoverRadius: 5,
+        pointBorderWidth: 2,
         fill: true,
         tension: smooth ? 0.35 : 0.25,
         borderWidth: 2,
@@ -333,23 +353,33 @@ const Progress = () => {
           }
         }
       },
+      decimation: { enabled: false },
       // Zoom plugin configuration (applies only if plugin is registered)
       zoom: zoomReady ? {
         zoom: {
-          wheel: { enabled: true, modifierKey: null },
-          pinch: { enabled: true },
+          // Wheel zoom: disable on small screens; gentler speed on desktop
+          wheel: { enabled: !isSmallScreen, modifierKey: null, speed: 0.05 },
+          // Make mobile pinch less sensitive
+          pinch: { enabled: true, speed: isSmallScreen ? 0.15 : 0.4 },
           mode: 'x',
           drag: { enabled: false }
         },
         pan: {
           enabled: true,
-          mode: 'x'
+          mode: 'x',
+          // Higher threshold on mobile to avoid accidental pans
+          threshold: isSmallScreen ? 25 : 10,
+          speed: isSmallScreen ? 3 : 10
         },
         limits: {
-          x: { min: 'original', max: 'original' },
+          // Prevent over-zooming into too few points on small screens
+          x: { min: 'original', max: 'original', minRange: isSmallScreen ? 6 : 3 },
           y: { min: 0 }
         }
       } : undefined
+    },
+    elements: {
+      point: { radius: 3, hoverRadius: 5, hitRadius: 8, borderWidth: 2 }
     },
     scales: {
       y: {
@@ -360,7 +390,15 @@ const Progress = () => {
       },
       x: {
         grid: { display: false },
-        ticks: { color: isDark ? '#9ca3af' : '#6b7280', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+        offset: true,
+        ticks: {
+          color: isDark ? '#9ca3af' : '#6b7280',
+          autoSkip: true,
+          maxTicksLimit: isSmallScreen ? 6 : 10,
+          maxRotation: isSmallScreen ? 60 : 0,
+          minRotation: isSmallScreen ? 45 : 0,
+          padding: isSmallScreen ? 8 : 4,
+        }
       }
     }
   };
@@ -745,9 +783,9 @@ const Progress = () => {
 
           {/* Progress Trend (Bottom) */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Progress Trend</h3>
-              <div className="flex gap-2">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Progress Trend</h3>
+              <div className="flex flex-wrap gap-2">
                 <button
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium ${trendType === 'average' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200'}`}
                   onClick={() => setTrendType('average')}
@@ -788,11 +826,43 @@ const Progress = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  className={`px-2.5 py-1.5 rounded-lg text-sm font-medium ${zoomReady ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                  disabled={!zoomReady}
+                  onClick={() => {
+                    try {
+                      const chart = chartRef.current?.chart || chartRef.current;
+                      if (chart && typeof chart.zoom === 'function') {
+                        // Zoom out slightly
+                        chart.zoom(0.9);
+                      }
+                    } catch {}
+                  }}
+                  title="Zoom Out"
+                >
+                  -
+                </button>
+                <button
+                  className={`px-2.5 py-1.5 rounded-lg text-sm font-medium ${zoomReady ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                  disabled={!zoomReady}
+                  onClick={() => {
+                    try {
+                      const chart = chartRef.current?.chart || chartRef.current;
+                      if (chart && typeof chart.zoom === 'function') {
+                        // Zoom in slightly
+                        chart.zoom(1.1);
+                      }
+                    } catch {}
+                  }}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <button
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium ${zoomReady ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   disabled={!zoomReady}
                   onClick={() => {
                     try {
-                      const chart = chartRef.current;
+                      const chart = chartRef.current?.chart || chartRef.current;
                       if (chart && chart.resetZoom) {
                         chart.resetZoom();
                       } else if (chart && chart.chart && chart.chart.resetZoom) {
