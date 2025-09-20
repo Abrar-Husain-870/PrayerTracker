@@ -281,6 +281,13 @@ const Progress = () => {
         ),
         backgroundColor: PRAYER_COLORS[PRAYER_STATUS.QAZA],
       },
+      {
+        label: 'Not Prayed',
+        data: Object.keys(stats.prayerTypeStats).map(prayer =>
+          stats.prayerTypeStats[prayer][PRAYER_STATUS.NOT_PRAYED]
+        ),
+        backgroundColor: PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
+      },
     ],
   } : null;
 
