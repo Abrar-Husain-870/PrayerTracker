@@ -5,6 +5,7 @@
   "dependencies": {
     "autoprefixer": "^10.4.16",
     "chart.js": "^4.5.0",
+    "chartjs-plugin-zoom": "^2.2.0",
     "firebase": "^10.7.1",
     "lucide-react": "^0.294.0",
     "postcss": "^8.4.32",

@@ -48,6 +48,113 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
   }
 };
 
+// Build per-day trend series (only complete days are included)
+export const getDailyTrend = async (userId, startDate, endDate, masjidMode = false) => {
+  const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
+  const dates = Object.keys(prayerData).sort();
+
+  // Use prayer scores according to mode
+  const prayerScores = masjidMode ? 
+    {
+      [PRAYER_STATUS.NOT_PRAYED]: 0,
+      [PRAYER_STATUS.QAZA]: 13,
+      [PRAYER_STATUS.HOME]: 27,
+      [PRAYER_STATUS.MASJID]: 27
+    } : PRAYER_SCORES;
+
+  const series = [];
+  let runningStreak = 0; // streak across complete, all-good days
+
+  dates.forEach(date => {
+    const dayData = prayerData[date];
+    const [y, m, d] = date.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+
+    // Determine completeness
+    let allFivePrayersMarked = true;
+    let dayScore = 0;
+    let markedCount = 0;
+    let dayHasAllGoodPrayers = true; // for streak (must be Home or Masjid only)
+
+    Object.values(PRAYER_TYPES).forEach(prayer => {
+      const status = dayData[prayer];
+      if (status !== undefined && status !== null && status !== '') {
+        markedCount++;
+        dayScore += prayerScores[status];
+        if (status === PRAYER_STATUS.NOT_PRAYED || status === PRAYER_STATUS.QAZA) {
+          dayHasAllGoodPrayers = false;
+        }
+      } else {
+        allFivePrayersMarked = false;
+        dayHasAllGoodPrayers = false;
+      }
+    });
+
+    // Friday Surah completeness
+    let fridaySurahMarked = true;
+    if (isFriday(dateObj)) {
+      if (dayData.hasOwnProperty(SURAH_ALKAHF) && dayData[SURAH_ALKAHF] !== null && dayData[SURAH_ALKAHF] !== '') {
+        const surahStatus = dayData[SURAH_ALKAHF];
+        // Add Surah score
+        if (surahStatus === SURAH_STATUS.RECITED || surahStatus === SURAH_STATUS.MISSED) {
+          dayScore += SURAH_SCORES[surahStatus];
+        } else {
+          fridaySurahMarked = false;
+        }
+      } else {
+        fridaySurahMarked = false;
+      }
+    }
+
+    const dayIsComplete = allFivePrayersMarked && (isFriday(dateObj) ? fridaySurahMarked : true);
+    if (!dayIsComplete) {
+      // Incomplete days are skipped from the trend
+      return;
+    }
+
+    // Update streak (only if all 5 are good i.e., Home or Masjid)
+    if (dayHasAllGoodPrayers && markedCount === 5) {
+      runningStreak++;
+    } else {
+      runningStreak = 0;
+    }
+
+    // Daily consistency: percentage of non-NOT_PRAYED over total prayers (5)
+    const goodOrQazaCount = Object.values(PRAYER_TYPES).reduce((acc, prayer) => {
+      const status = dayData[prayer];
+      if (status !== undefined && status !== null && status !== '') {
+        // For consistency we consider all but NOT_PRAYED as "done"
+        return acc + (status !== PRAYER_STATUS.NOT_PRAYED ? 1 : 0);
+      }
+      return acc;
+    }, 0);
+    const dayConsistency = (goodOrQazaCount / 5) * 100;
+
+    // Masjid percentage for the day
+    const masjidCount = Object.values(PRAYER_TYPES).reduce((acc, prayer) => {
+      return acc + (dayData[prayer] === PRAYER_STATUS.MASJID ? 1 : 0);
+    }, 0);
+    const dayMasjidPct = (masjidCount / 5) * 100;
+
+    // Composite score per day using the same weights
+    const maxPossibleAverage = 145; // 5 prayers * 27 + 10 on Friday if recited
+    const averageScoreNormalized = Math.min((dayScore / maxPossibleAverage) * 100, 100);
+    const compositeScore = 
+      (averageScoreNormalized * 0.5) +
+      (dayConsistency * 0.25) +
+      (Math.min((runningStreak / 30) * 100, 100) * 0.15) +
+      (dayMasjidPct * 0.1);
+
+    series.push({
+      date,
+      averageScore: dayScore,
+      compositeScore: Math.round(compositeScore * 100) / 100
+    });
+  });
+
+  return series;
+};
+
 // Calculate prayer statistics for a given period
 export const calculatePrayerStats = (prayerData, masjidMode = false) => {
   const stats = {
@@ -108,6 +215,7 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
   let currentStreakCount = 0;
   let bestStreakCount = 0;
   let tempStreak = 0;
+  let completeDaysCount = 0; // Days where ALL activities are marked
 
   // Calculate best streak (ascending order)
   dates.forEach(date => {
@@ -116,85 +224,80 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
     const [year, month, day] = date.split('-').map(Number);
     const dateObj = new Date(year, month - 1, day); // month is 0-indexed
     let dayScore = 0;
-    // let dayPrayerCount = 0; // Unused for now
-    // let dayAllPrayersTracked = true; // Unused for now
+    let markedPrayersCount = 0;
+    let allFivePrayersMarked = true;
     
     console.log(`Analytics Debug - Processing date: ${date}, dateObj: ${dateObj}, isFriday: ${isFriday(dateObj)}`);
 
     Object.values(PRAYER_TYPES).forEach(prayer => {
-      // Only process prayers that are explicitly marked (not undefined/null)
+      // Only process prayers that are explicitly marked (not undefined/null/empty)
       if (dayData[prayer] !== undefined && dayData[prayer] !== null && dayData[prayer] !== '') {
         const status = dayData[prayer];
-        
-        // Update overall breakdown
-        stats.prayerBreakdown[status]++;
-        
-        // Update prayer type breakdown
-        stats.prayerTypeStats[prayer][status]++;
-        stats.prayerTypeStats[prayer].total++;
-        
-        // Update totals
-        stats.totalPrayers++;
+        markedPrayersCount++;
         dayScore += prayerScores[status];
-        
-        // if (status !== PRAYER_STATUS.NOT_PRAYED) {
-        //   dayPrayerCount++; // Commented out - variable not used
-        // } else {
-        //   dayAllPrayersTracked = false; // Commented out - variable not used
-        // }
       } else {
-        // Prayer is unmarked - don't count it in any statistics
-        // dayAllPrayersTracked = false; // Commented out - variable not used
+        allFivePrayersMarked = false; // at least one prayer not marked
       }
     });
 
     // Handle Surah Al-Kahf for Fridays
+    let fridaySurahMarked = true; // default true for non-Fridays
     if (isFriday(dateObj)) {
       stats.surahAlKahfStats.totalFridays++;
-      console.log(`Analytics Debug - Found Friday: ${date}, Day: ${dateObj.getDay()}, Surah Data:`, dayData[SURAH_ALKAHF]);
-      console.log(`Analytics Debug - Full day data for ${date}:`, dayData);
-      console.log(`Analytics Debug - SURAH_ALKAHF constant:`, SURAH_ALKAHF);
-      
-      // Check if Surah Al-Kahf data exists (not undefined and not null)
+      // Check if Surah Al-Kahf data exists (not undefined/null/empty)
       if (dayData.hasOwnProperty(SURAH_ALKAHF) && dayData[SURAH_ALKAHF] !== null) {
         const surahStatus = dayData[SURAH_ALKAHF];
-        
-        // Handle empty string as not tracked (when user selects "-- Select --")
         if (surahStatus === '') {
           stats.surahAlKahfStats.notTracked++;
-          console.log(`Analytics Debug - Surah Al-Kahf NOT TRACKED (empty string) on Friday ${date}`);
+          fridaySurahMarked = false;
         } else if (surahStatus === SURAH_STATUS.RECITED) {
           stats.surahAlKahfStats.recited++;
           dayScore += SURAH_SCORES[SURAH_STATUS.RECITED];
-          console.log(`Analytics Debug - Surah Al-Kahf RECITED on ${date}`);
         } else if (surahStatus === SURAH_STATUS.MISSED) {
           stats.surahAlKahfStats.missed++;
           dayScore += SURAH_SCORES[SURAH_STATUS.MISSED];
-          console.log(`Analytics Debug - Surah Al-Kahf MISSED on ${date}`);
         } else {
           // Unknown status, treat as not tracked
           stats.surahAlKahfStats.notTracked++;
-          console.log(`Analytics Debug - Surah Al-Kahf UNKNOWN STATUS (${surahStatus}) on Friday ${date}`);
+          fridaySurahMarked = false;
         }
       } else {
         stats.surahAlKahfStats.notTracked++;
-        console.log(`Analytics Debug - Surah Al-Kahf NOT TRACKED (no key) on Friday ${date}`);
+        fridaySurahMarked = false;
       }
     }
 
-    stats.totalScore += dayScore;
-    // Use the highest possible score for the mode (27 points per prayer in both modes)
-    const maxDailyScore = masjidMode ? 27 : PRAYER_SCORES[PRAYER_STATUS.MASJID];
-    stats.maxPossibleScore += maxDailyScore * 5;
-    
-    // Add Surah Al-Kahf to max possible score for Fridays
-    if (isFriday(dateObj)) {
-      stats.maxPossibleScore += SURAH_SCORES[SURAH_STATUS.RECITED];
+    // Determine if this day is COMPLETE: all 5 prayers marked AND (if Friday) Surah Al-Kahf marked
+    const dayIsComplete = allFivePrayersMarked && (isFriday(dateObj) ? fridaySurahMarked : true);
+
+    if (dayIsComplete) {
+      // Only include complete days in composite-impacting aggregates
+      completeDaysCount++;
+
+      // Update overall breakdowns and totals for complete days
+      Object.values(PRAYER_TYPES).forEach(prayer => {
+        const status = dayData[prayer];
+        stats.prayerBreakdown[status]++;
+        stats.prayerTypeStats[prayer][status]++;
+        stats.prayerTypeStats[prayer].total++;
+        stats.totalPrayers++;
+      });
+
+      stats.totalScore += dayScore;
+
+      // Use the highest possible score for the mode (27 points per prayer in both modes)
+      const maxDailyScore = masjidMode ? 27 : PRAYER_SCORES[PRAYER_STATUS.MASJID];
+      stats.maxPossibleScore += maxDailyScore * 5;
+      
+      // Add Surah Al-Kahf to max possible score for Fridays
+      if (isFriday(dateObj)) {
+        stats.maxPossibleScore += SURAH_SCORES[SURAH_STATUS.RECITED];
+      }
     }
 
     // Calculate streaks (days with all 5 prayers as Home or Masjid - no Qaza, Not Prayed, or unmarked)
     let dayHasAllGoodPrayers = true;
-    let markedPrayersCount = 0;
+    markedPrayersCount = 0;
     
     Object.values(PRAYER_TYPES).forEach(prayer => {
       if (dayData[prayer] !== undefined && dayData[prayer] !== null && dayData[prayer] !== '') {
@@ -272,10 +375,10 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
   
   stats.currentStreak = tempStreak;
   
-  // Set totalDays to actual days tracked (not all days in range)
-  stats.totalDays = dates.length;
+  // Set totalDays to only COMPLETE days (all activities marked)
+  stats.totalDays = completeDaysCount;
   
-  // Calculate average score as: total daily scores / number of days actually tracked
+  // Calculate average score as: total daily scores / number of COMPLETE days
   stats.averageScore = stats.totalDays > 0 ? stats.totalScore / stats.totalDays : 0;
   stats.consistency = stats.totalPrayers > 0 ? ((stats.totalPrayers - stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED]) / stats.totalPrayers) * 100 : 0;
   

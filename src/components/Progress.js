@@ -1,16 +1,18 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Bar, Pie, Line } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -33,7 +35,8 @@ import {
   getYearlyStats, 
   getRecentStats,
   getAllTimeStats,
-  getMotivationalInsights 
+  getMotivationalInsights,
+  getDailyTrend
 } from '../services/analyticsService';
 import { PRAYER_STATUS, PRAYER_COLORS } from '../services/prayerService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -42,6 +45,8 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
@@ -58,6 +63,11 @@ const Progress = () => {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(false);
   const [masjidMode, setMasjidMode] = useState(false);
+  const [trendType, setTrendType] = useState('average'); // 'average' | 'composite'
+  const [dailyTrend, setDailyTrend] = useState([]);
+  const [smooth, setSmooth] = useState(false); // moving average smoothing
+  const [zoomReady, setZoomReady] = useState(false); // zoom plugin loaded
+  const chartRef = useRef(null);
 
   // Load user preferences from localStorage
   useEffect(() => {
@@ -99,32 +109,75 @@ const Progress = () => {
     }
   }, [currentUser, timeframe, selectedMonth, selectedYear, masjidMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Lazy-load the zoom plugin to avoid hard dependency at build time.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import('chartjs-plugin-zoom');
+        if (mod && mod.default) {
+          // Register only once
+          if (!ChartJS.registry.plugins.get('zoom')) {
+            ChartJS.register(mod.default);
+          }
+          if (mounted) setZoomReady(true);
+        }
+      } catch (e) {
+        // Plugin not installed; zoom will be disabled gracefully
+        if (mounted) setZoomReady(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const loadStats = async () => {
     try {
       setLoading(true);
       let statsData;
+      let startDate;
+      let endDate;
       
       switch (timeframe) {
         case 'month':
           statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth, masjidMode);
+          startDate = new Date(selectedYear, selectedMonth - 1, 1);
+          endDate = new Date(selectedYear, selectedMonth, 0);
           break;
         case 'year':
           statsData = await getYearlyStats(currentUser.uid, selectedYear, masjidMode);
+          startDate = new Date(selectedYear, 0, 1);
+          endDate = new Date(selectedYear, 11, 31);
           break;
         case 'recent':
           statsData = await getRecentStats(currentUser.uid, 30, masjidMode);
+          endDate = new Date();
+          startDate = new Date();
+          startDate.setDate(endDate.getDate() - 29);
           break;
         case 'alltime':
           statsData = await getAllTimeStats(currentUser.uid, masjidMode);
+          endDate = new Date();
+          startDate = new Date();
+          startDate.setFullYear(endDate.getFullYear() - 1); // last 12 months for trend
           break;
         default:
           statsData = await getMonthlyStats(currentUser.uid, selectedYear, selectedMonth, masjidMode);
+          startDate = new Date(selectedYear, selectedMonth - 1, 1);
+          endDate = new Date(selectedYear, selectedMonth, 0);
       }
       
       console.log('Progress Debug - Loaded stats data:', statsData);
       console.log('Progress Debug - Surah Al-Kahf stats:', statsData.surahAlKahfStats);
       setStats(statsData);
       setInsights(getMotivationalInsights(statsData));
+
+      // Load daily trend (only complete days are returned by service)
+      if (startDate && endDate) {
+        const trend = await getDailyTrend(currentUser.uid, startDate, endDate, masjidMode);
+        setDailyTrend(trend);
+      } else {
+        setDailyTrend([]);
+      }
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -222,6 +275,96 @@ const Progress = () => {
     },
   };
 
+  // Trend chart configuration
+  // Format dates like 31/6/25
+  const formatShortDate = (iso) => {
+    if (!iso) return '';
+    const [yy, mm, dd] = iso.split('-').map(Number);
+    return `${dd}/${mm}/${String(yy).slice(2)}`;
+  };
+  const trendLabels = dailyTrend.map(p => formatShortDate(p.date));
+  const trendDataValues = trendType === 'average' ? dailyTrend.map(p => p.averageScore) : dailyTrend.map(p => p.compositeScore);
+
+  // Compute moving average for smoothing
+  const movingAverage = (values, windowSize = 7) => {
+    const result = [];
+    let sum = 0;
+    for (let i = 0; i < values.length; i++) {
+      sum += values[i];
+      if (i >= windowSize) sum -= values[i - windowSize];
+      const denom = Math.min(i + 1, windowSize);
+      result.push(sum / denom);
+    }
+    return result;
+  };
+  const smoothedValues = movingAverage(trendDataValues, trendType === 'average' ? 5 : 7);
+  const primaryStroke = isDark ? '#60a5fa' : '#3b82f6'; // blue-500/400
+  const primaryFill = isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)';
+
+  const trendData = {
+    labels: trendLabels,
+    datasets: [
+      {
+        label: trendType === 'average' ? 'Average Score' : 'Composite Score',
+        data: smooth ? smoothedValues : trendDataValues,
+        borderColor: primaryStroke,
+        backgroundColor: primaryFill,
+        pointBackgroundColor: primaryStroke,
+        pointBorderColor: primaryStroke,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: smooth ? 0.35 : 0.25,
+        borderWidth: 2,
+      }
+    ]
+  };
+
+  const trendOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            const val = ctx.parsed.y;
+            return (trendType === 'average' ? 'Average: ' : 'Composite: ') + (trendType === 'average' ? val.toFixed(0) : val.toFixed(2));
+          }
+        }
+      },
+      // Zoom plugin configuration (applies only if plugin is registered)
+      zoom: zoomReady ? {
+        zoom: {
+          wheel: { enabled: true, modifierKey: null },
+          pinch: { enabled: true },
+          mode: 'x',
+          drag: { enabled: false }
+        },
+        pan: {
+          enabled: true,
+          mode: 'x'
+        },
+        limits: {
+          x: { min: 'original', max: 'original' },
+          y: { min: 0 }
+        }
+      } : undefined
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        suggestedMax: trendType === 'average' ? 145 : 100,
+        grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+        ticks: { color: isDark ? '#9ca3af' : '#6b7280' }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: isDark ? '#9ca3af' : '#6b7280', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+      }
+    }
+  };
+
   const pieOptions = {
     responsive: true,
     plugins: {
@@ -279,6 +422,7 @@ const Progress = () => {
             <h1 className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">Your Spiritual Journey</h1>
             <p className="text-primary-100 text-sm sm:text-base">Track your progress and celebrate your growth</p>
           </div>
+
           <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 text-primary-200" />
         </div>
 
@@ -378,13 +522,15 @@ const Progress = () => {
 
       {stats && (
         <>
+          {/* Trend Line Chart moved to bottom */}
+
           {/* Key Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Days Tracked</p>
-                  <p className="text-xl sm:text-3xl font-bold text-gray-900">{stats.totalTrackedDays}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm font-medium">Completed Days</p>
+                  <p className="text-xl sm:text-3xl font-bold text-gray-900">{stats.totalDays}</p>
                 </div>
                 <Calendar className="w-5 h-5 sm:w-8 sm:h-8 text-blue-500" />
               </div>
@@ -594,6 +740,71 @@ const Progress = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Progress Trend (Bottom) */}
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Progress Trend</h3>
+              <div className="flex gap-2">
+                <button
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${trendType === 'average' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200'}`}
+                  onClick={() => setTrendType('average')}
+                >
+                  Average Score
+                </button>
+                <button
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${trendType === 'composite' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200'}`}
+                  onClick={() => setTrendType('composite')}
+                >
+                  Composite Score
+                </button>
+                <div className="mx-2 w-px bg-gray-200 dark:bg-gray-800" />
+                <button
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${smooth ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200'}`}
+                  onClick={() => setSmooth(s => !s)}
+                  title="Toggle smoothing (moving average)"
+                >
+                  {smooth ? 'Smooth: On' : 'Smooth: Off'}
+                </button>
+              </div>
+            </div>
+            <div className="h-64">
+              {dailyTrend.length > 0 ? (
+                <Line ref={chartRef} data={trendData} options={trendOptions} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <Calendar className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>No completed day data in selected period</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-2 sm:mt-3 flex items-center justify-between gap-2">
+              <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 px-2">
+                Smooth ON: 5-day avg (Average) / 7-day avg (Composite) for a clearer trend; OFF shows exact daily values
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${zoomReady ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                  disabled={!zoomReady}
+                  onClick={() => {
+                    try {
+                      const chart = chartRef.current;
+                      if (chart && chart.resetZoom) {
+                        chart.resetZoom();
+                      } else if (chart && chart.chart && chart.chart.resetZoom) {
+                        chart.chart.resetZoom();
+                      }
+                    } catch {}
+                  }}
+                  title={zoomReady ? 'Reset zoom to full range' : 'Zoom unavailable (plugin not installed)'}
+                >
+                  Reset Zoom
+                </button>
+              </div>
             </div>
           </div>
         </>
