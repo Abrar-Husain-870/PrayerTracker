@@ -37,9 +37,10 @@ import {
   getRecentStats,
   getAllTimeStats,
   getMotivationalInsights,
-  getDailyTrend
+  getDailyTrend,
+  getPrayerDataInRange
 } from '../services/analyticsService';
-import { PRAYER_STATUS, PRAYER_COLORS } from '../services/prayerService';
+import { PRAYER_STATUS, PRAYER_COLORS, PRAYER_TYPES, PRAYER_SCORES, SURAH_ALKAHF, SURAH_STATUS, SURAH_SCORES } from '../services/prayerService';
 import { useTheme } from '../contexts/ThemeContext';
 
 ChartJS.register(
@@ -67,6 +68,7 @@ const Progress = () => {
   const [masjidMode, setMasjidMode] = useState(false);
   const [trendType, setTrendType] = useState('average'); // 'average' | 'composite'
   const [dailyTrend, setDailyTrend] = useState([]);
+  const [cumulativeTrend, setCumulativeTrend] = useState([]); // leaderboard-style cumulative series
   const [smooth, setSmooth] = useState(false); // moving average smoothing
   const [zoomReady, setZoomReady] = useState(false); // zoom plugin loaded
   const [isSmallScreen, setIsSmallScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 480 : false);
@@ -188,12 +190,157 @@ const Progress = () => {
       setStats(statsData);
       setInsights(getMotivationalInsights(statsData));
 
-      // Load daily trend (only complete days are returned by service)
+      // Load daily trend (complete days only) and build cumulative leaderboard-style series
       if (startDate && endDate) {
         const trend = await getDailyTrend(currentUser.uid, startDate, endDate, masjidMode);
         setDailyTrend(trend);
+
+        // Build cumulative series using raw prayer data and leaderboard formulas
+        const prayerData = await getPrayerDataInRange(currentUser.uid, startDate, endDate);
+        const dates = Object.keys(prayerData).sort();
+
+        // Cumulative aggregates
+        let totalScore = 0;
+        let totalDays = 0; // complete days counted
+        let totalPrayers = 0;
+        const breakdown = {
+          [PRAYER_STATUS.NOT_PRAYED]: 0,
+          [PRAYER_STATUS.QAZA]: 0,
+          [PRAYER_STATUS.HOME]: 0,
+          [PRAYER_STATUS.MASJID]: 0
+        };
+        let currentStreak = 0;
+        // Surah Al-Kahf running counters for Home Mode
+        let fridaysTotal = 0;
+        let fridaysRecited = 0;
+
+        const series = [];
+
+        // Helper: per-day completeness and scoring similar to calculatePrayerStats
+        const dailyMaxPrayerScore = masjidMode ? 27 : 27; // both modes use 27 as per leaderboard
+        const fridayBonus = 10;
+
+        const isFridayLocal = (dateObj) => dateObj.getDay() === 5;
+
+        dates.forEach(date => {
+          const dayData = prayerData[date];
+          const [y, m, d] = date.split('-').map(Number);
+          const dateObj = new Date(y, m - 1, d);
+
+          let dayScore = 0;
+          let allFivePrayersMarked = true;
+          let markedPrayersCount = 0;
+          let dayHasAllGoodPrayers = true; // Home or Masjid only
+
+          Object.values(PRAYER_TYPES).forEach(prayer => {
+            const status = dayData[prayer];
+            if (status !== undefined && status !== null && status !== '') {
+              markedPrayersCount++;
+              // Score per status mirrors PRAYER_SCORES but leaderboard uses 27 for both Home/Masjid in masjidMode; otherwise PRAYER_SCORES
+              const scoreMap = masjidMode ? {
+                [PRAYER_STATUS.NOT_PRAYED]: 0,
+                [PRAYER_STATUS.QAZA]: 13,
+                [PRAYER_STATUS.HOME]: 27,
+                [PRAYER_STATUS.MASJID]: 27,
+              } : PRAYER_SCORES;
+              dayScore += scoreMap[status];
+              if (status === PRAYER_STATUS.NOT_PRAYED || status === PRAYER_STATUS.QAZA) {
+                dayHasAllGoodPrayers = false;
+              }
+            } else {
+              allFivePrayersMarked = false;
+              dayHasAllGoodPrayers = false;
+            }
+          });
+
+          // Friday Surah handling for completeness and score
+          let fridayComplete = true;
+          if (isFridayLocal(dateObj)) {
+            if (dayData.hasOwnProperty(SURAH_ALKAHF) && dayData[SURAH_ALKAHF] !== null) {
+              const surahStatus = dayData[SURAH_ALKAHF];
+              if (surahStatus === '') {
+                fridayComplete = false;
+              } else if (surahStatus === SURAH_STATUS.RECITED || surahStatus === SURAH_STATUS.MISSED) {
+                // Use the same scoring as analytics service / leaderboard
+                dayScore += SURAH_SCORES[surahStatus] || 0;
+              } else {
+                fridayComplete = false;
+              }
+            } else {
+              fridayComplete = false;
+            }
+          }
+
+          const dayIsComplete = allFivePrayersMarked && (isFridayLocal(dateObj) ? fridayComplete : true);
+
+          // Update streak (only if 5 marked and all are Home/Masjid)
+          if (dayHasAllGoodPrayers && markedPrayersCount === 5) {
+            currentStreak++;
+          } else {
+            currentStreak = 0;
+          }
+
+          if (dayIsComplete) {
+            totalDays++;
+            totalScore += dayScore;
+            // update breakdown & totals
+            Object.values(PRAYER_TYPES).forEach(prayer => {
+              const status = dayData[prayer];
+              breakdown[status]++;
+              totalPrayers++;
+            });
+            // Track surah counters by calendar (only increment totals when it's Friday and status set)
+            if (isFridayLocal(dateObj) && dayData.hasOwnProperty(SURAH_ALKAHF) && dayData[SURAH_ALKAHF] !== '') {
+              fridaysTotal++;
+              if (dayData[SURAH_ALKAHF] === SURAH_STATUS.RECITED) fridaysRecited++;
+            }
+          }
+
+          // Derive cumulative metrics up to this date
+          const averageScore = totalDays > 0 ? totalScore / totalDays : 0;
+          const consistency = totalPrayers > 0 ? ((totalPrayers - breakdown[PRAYER_STATUS.NOT_PRAYED]) / totalPrayers) * 100 : 0;
+          const masjidPercentage = totalPrayers > 0 ? (breakdown[PRAYER_STATUS.MASJID] / totalPrayers) * 100 : 0;
+
+          // New Composite formula alignment with Leaderboard
+          // 1) Average @45%
+          const maxPossibleAverage = 145;
+          const avgNorm = Math.min(averageScore / maxPossibleAverage, 1) * 100;
+          const avgComp = avgNorm * 0.45;
+          // 2) Consistency @20%
+          const consComp = (Math.max(0, Math.min(consistency || 0, 100))) * 0.20;
+          // 3) Streak @10%
+          const streakNorm = Math.min(currentStreak / 30, 1) * 100;
+          const streakComp = streakNorm * 0.10;
+          // 4) Special (Masjid% or Surah) @10%
+          let specialMetric = masjidPercentage || 0;
+          if (masjidMode) {
+            const surahConsistency = fridaysTotal > 0 ? (fridaysRecited / fridaysTotal) * 100 : null;
+            specialMetric = (surahConsistency != null) ? surahConsistency : (consistency || 0);
+          }
+          specialMetric = Math.max(0, Math.min(specialMetric, 100));
+          const specialComp = specialMetric * 0.10;
+          // 5) Days Tracked @15% with timeframe-aware cap
+          let cap = 60;
+          if (timeframe === 'recent') cap = 30;
+          else if (timeframe === 'month') cap = new Date(selectedYear, selectedMonth, 0).getDate();
+          else if (timeframe === 'year') cap = 60;
+          else if (timeframe === 'alltime') cap = 60;
+          const daysTrackedNorm = Math.min(totalDays / cap, 1) * 100;
+          const daysTrackedComp = daysTrackedNorm * 0.15;
+
+          let composite = avgComp + consComp + streakComp + specialComp + daysTrackedComp;
+
+          series.push({
+            date,
+            avg: averageScore,
+            comp: Math.round(composite * 100) / 100
+          });
+        });
+
+        setCumulativeTrend(series);
       } else {
         setDailyTrend([]);
+        setCumulativeTrend([]);
       }
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -234,62 +381,125 @@ const Progress = () => {
   const isDark = resolvedTheme === 'dark';
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false;
   const pieBorderColor = isDark ? '#0a0a0a' : '#ffffff';
-  const prayerBreakdownData = stats ? {
-    labels: ['Masjid', 'Home', 'Qaza', 'Not Prayed'],
-    datasets: [
-      {
-        data: [
-          stats.prayerBreakdown[PRAYER_STATUS.MASJID],
-          stats.prayerBreakdown[PRAYER_STATUS.HOME],
-          stats.prayerBreakdown[PRAYER_STATUS.QAZA],
-          stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED],
+  const prayerBreakdownData = stats ? (() => {
+    if (masjidMode) {
+      // Home Prayer Mode: custom order and slices per request
+      // New order (clockwise from top): Perfect Days (green), Prayed (blue), Qaza (yellow), Not Prayed (red)
+      const labels = ['Perfect Days', 'Prayed', 'Qaza', 'Not Prayed'];
+      const data = [
+        stats.totalDays,
+        stats.prayerBreakdown[PRAYER_STATUS.HOME],
+        stats.prayerBreakdown[PRAYER_STATUS.QAZA],
+        stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED],
+      ];
+      const backgroundColor = [
+        '#22c55e',
+        PRAYER_COLORS[PRAYER_STATUS.HOME],
+        PRAYER_COLORS[PRAYER_STATUS.QAZA],
+        PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
+      ];
+      return {
+        labels,
+        datasets: [
+          {
+            data,
+            backgroundColor,
+            borderWidth: 2,
+            borderColor: pieBorderColor,
+            hoverBorderWidth: 2,
+          },
         ],
-        backgroundColor: [
-          PRAYER_COLORS[PRAYER_STATUS.MASJID],
-          PRAYER_COLORS[PRAYER_STATUS.HOME],
-          PRAYER_COLORS[PRAYER_STATUS.QAZA],
-          PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
-        ],
-        borderWidth: 2,
-        borderColor: pieBorderColor,
-        hoverBorderWidth: 2,
-      },
-    ],
-  } : null;
+      };
+    }
+    // Standard mode: include Masjid slice
+    return {
+      labels: ['Masjid', 'Home', 'Qaza', 'Not Prayed'],
+      datasets: [
+        {
+          data: [
+            stats.prayerBreakdown[PRAYER_STATUS.MASJID],
+            stats.prayerBreakdown[PRAYER_STATUS.HOME],
+            stats.prayerBreakdown[PRAYER_STATUS.QAZA],
+            stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED],
+          ],
+          backgroundColor: [
+            PRAYER_COLORS[PRAYER_STATUS.MASJID],
+            PRAYER_COLORS[PRAYER_STATUS.HOME],
+            PRAYER_COLORS[PRAYER_STATUS.QAZA],
+            PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
+          ],
+          borderWidth: 2,
+          borderColor: pieBorderColor,
+          hoverBorderWidth: 2,
+        },
+      ],
+    };
+  })() : null;
 
-  const prayerTypeData = stats ? {
-    labels: ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'],
-    datasets: [
-      {
-        label: 'Masjid',
-        data: Object.keys(stats.prayerTypeStats).map(prayer => 
-          stats.prayerTypeStats[prayer][PRAYER_STATUS.MASJID]
-        ),
-        backgroundColor: PRAYER_COLORS[PRAYER_STATUS.MASJID],
-      },
-      {
-        label: 'Home',
-        data: Object.keys(stats.prayerTypeStats).map(prayer => 
-          stats.prayerTypeStats[prayer][PRAYER_STATUS.HOME]
-        ),
-        backgroundColor: PRAYER_COLORS[PRAYER_STATUS.HOME],
-      },
-      {
-        label: 'Qaza',
-        data: Object.keys(stats.prayerTypeStats).map(prayer => 
-          stats.prayerTypeStats[prayer][PRAYER_STATUS.QAZA]
-        ),
-        backgroundColor: PRAYER_COLORS[PRAYER_STATUS.QAZA],
-      },
-      {
-        label: 'Not Prayed',
-        data: Object.keys(stats.prayerTypeStats).map(prayer =>
-          stats.prayerTypeStats[prayer][PRAYER_STATUS.NOT_PRAYED]
-        ),
-        backgroundColor: PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
-      },
-    ],
-  } : null;
+  const prayerTypeData = stats ? (() => {
+    const labels = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    if (masjidMode) {
+      return {
+        labels,
+        datasets: [
+          {
+            label: 'Home',
+            data: Object.keys(stats.prayerTypeStats).map(prayer => 
+              stats.prayerTypeStats[prayer][PRAYER_STATUS.HOME]
+            ),
+            backgroundColor: PRAYER_COLORS[PRAYER_STATUS.HOME],
+          },
+          {
+            label: 'Qaza',
+            data: Object.keys(stats.prayerTypeStats).map(prayer => 
+              stats.prayerTypeStats[prayer][PRAYER_STATUS.QAZA]
+            ),
+            backgroundColor: PRAYER_COLORS[PRAYER_STATUS.QAZA],
+          },
+          {
+            label: 'Not Prayed',
+            data: Object.keys(stats.prayerTypeStats).map(prayer =>
+              stats.prayerTypeStats[prayer][PRAYER_STATUS.NOT_PRAYED]
+            ),
+            backgroundColor: PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
+          },
+        ],
+      };
+    }
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Masjid',
+          data: Object.keys(stats.prayerTypeStats).map(prayer => 
+            stats.prayerTypeStats[prayer][PRAYER_STATUS.MASJID]
+          ),
+          backgroundColor: PRAYER_COLORS[PRAYER_STATUS.MASJID],
+        },
+        {
+          label: 'Home',
+          data: Object.keys(stats.prayerTypeStats).map(prayer => 
+            stats.prayerTypeStats[prayer][PRAYER_STATUS.HOME]
+          ),
+          backgroundColor: PRAYER_COLORS[PRAYER_STATUS.HOME],
+        },
+        {
+          label: 'Qaza',
+          data: Object.keys(stats.prayerTypeStats).map(prayer => 
+            stats.prayerTypeStats[prayer][PRAYER_STATUS.QAZA]
+          ),
+          backgroundColor: PRAYER_COLORS[PRAYER_STATUS.QAZA],
+        },
+        {
+          label: 'Not Prayed',
+          data: Object.keys(stats.prayerTypeStats).map(prayer =>
+            stats.prayerTypeStats[prayer][PRAYER_STATUS.NOT_PRAYED]
+          ),
+          backgroundColor: PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED],
+        },
+      ],
+    };
+  })() : null;
 
   const chartOptions = {
     responsive: true,
@@ -307,8 +517,14 @@ const Progress = () => {
     const [yy, mm, dd] = iso.split('-').map(Number);
     return `${dd}/${mm}/${String(yy).slice(2)}`;
   };
-  const trendLabels = dailyTrend.map(p => formatShortDate(p.date));
-  const trendDataValues = trendType === 'average' ? dailyTrend.map(p => p.averageScore) : dailyTrend.map(p => p.compositeScore);
+  const trendLabels = (cumulativeTrend.length > 0 ? cumulativeTrend : dailyTrend).map(p => formatShortDate(p.date));
+  // Use leaderboard-style cumulative series when available, otherwise fallback to per-day values
+  const trendDataValues = (() => {
+    if (cumulativeTrend.length > 0) {
+      return trendType === 'average' ? cumulativeTrend.map(p => p.avg) : cumulativeTrend.map(p => p.comp);
+    }
+    return trendType === 'average' ? dailyTrend.map(p => p.averageScore) : dailyTrend.map(p => p.compositeScore);
+  })();
 
   // Compute moving average for smoothing
   const movingAverage = (values, windowSize = 7) => {
@@ -371,9 +587,9 @@ const Progress = () => {
         pointBackgroundColor: primaryStroke,
         pointBorderColor: primaryStroke,
         pointStyle: 'circle',
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        pointBorderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointBorderWidth: 0,
         fill: true,
         tension: smooth ? 0.35 : 0.25,
         borderWidth: 2,
@@ -420,7 +636,7 @@ const Progress = () => {
       } : undefined
     },
     elements: {
-      point: { radius: 3, hoverRadius: 5, hitRadius: 8, borderWidth: 2 }
+      point: { radius: 0, hoverRadius: 0, hitRadius: 6, borderWidth: 0 }
     },
     scales: {
       y: {
@@ -456,11 +672,14 @@ const Progress = () => {
           label: function(context) {
             const total = context.dataset.data.reduce((a, b) => a + b, 0);
             const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+            if (context.label === 'Perfect Days') return `${context.label}: ${context.parsed} days (${percentage}%)`;
             return `${context.label}: ${context.parsed} (${percentage}%)`;
           }
         }
       }
     },
+    // Start pie from top
+    rotation: -Math.PI / 2,
     elements: {
       arc: {
         borderWidth: 2,
@@ -648,6 +867,30 @@ const Progress = () => {
               </div>
             </div>
 
+            {/* Masjid % or Surah Al-Kahf Consistency (conditional) */}
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  {masjidMode ? (
+                    <>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Surah Al-Kahf Consistency</p>
+                      <p className="text-xl sm:text-3xl font-bold text-purple-600">{(stats.surahAlKahfStats?.consistency || 0).toFixed(1)}%</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-gray-600 text-xs sm:text-sm font-medium">Masjid Percentage</p>
+                      <p className="text-xl sm:text-3xl font-bold text-blue-600">{(stats.masjidPercentage || 0).toFixed(1)}%</p>
+                    </>
+                  )}
+                </div>
+                {masjidMode ? (
+                  <Book className="w-5 h-5 sm:w-8 sm:h-8 text-purple-500" />
+                ) : (
+                  <Church className="w-5 h-5 sm:w-8 sm:h-8 text-blue-500" />
+                )}
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 col-span-2 md:col-span-1 glass-card">
               <div className="flex items-center justify-between">
                 <div>
@@ -798,28 +1041,96 @@ const Progress = () => {
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 dark:bg-black dark:border-gray-800 glass-card">
             <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 sm:mb-6">Detailed Statistics</h3>
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-              {Object.entries(stats.prayerBreakdown).map(([status, count]) => {
-                const percentage = stats.totalPrayers > 0 ? (count / stats.totalPrayers * 100).toFixed(1) : 0;
-                return (
-                  <div key={status} className="text-center">
+              {masjidMode ? (
+                // Home Prayer Mode: show Home, Qaza, Not Prayed, then Surah Al-Kahf last
+                <>
+                  {/* Home */}
+                  <div className="text-center">
                     <div className="flex items-center justify-center mb-3">
                       <div 
                         className="w-12 h-12 rounded-full flex items-center justify-center text-white"
-                        style={{ backgroundColor: PRAYER_COLORS[status] }}
+                        style={{ backgroundColor: PRAYER_COLORS[PRAYER_STATUS.HOME] }}
                       >
-                        {getPrayerStatusIcon(status)}
+                        {getPrayerStatusIcon(PRAYER_STATUS.HOME)}
                       </div>
                     </div>
-                    <h4 className="font-semibold text-gray-800 mb-1">
-                      {status === PRAYER_STATUS.MASJID ? 'Masjid' :
-                       status === PRAYER_STATUS.HOME ? 'Home' :
-                       status === PRAYER_STATUS.QAZA ? 'Qaza' : 'Not Prayed'}
-                    </h4>
-                    <p className="text-2xl font-bold text-gray-900">{count}</p>
-                    <p className="text-sm text-gray-600">{percentage}%</p>
+                    <h4 className="font-semibold text-gray-800 mb-1">Home</h4>
+                    <p className="text-2xl font-bold text-gray-900">{stats.prayerBreakdown[PRAYER_STATUS.HOME]}</p>
+                    <p className="text-sm text-gray-600">{stats.totalPrayers > 0 ? ((stats.prayerBreakdown[PRAYER_STATUS.HOME] / stats.totalPrayers) * 100).toFixed(1) : 0}%</p>
                   </div>
-                );
-              })}
+
+                  {/* Qaza */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-3">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                        style={{ backgroundColor: PRAYER_COLORS[PRAYER_STATUS.QAZA] }}
+                      >
+                        {getPrayerStatusIcon(PRAYER_STATUS.QAZA)}
+                      </div>
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-1">Qaza</h4>
+                    <p className="text-2xl font-bold text-gray-900">{stats.prayerBreakdown[PRAYER_STATUS.QAZA]}</p>
+                    <p className="text-sm text-gray-600">{stats.totalPrayers > 0 ? ((stats.prayerBreakdown[PRAYER_STATUS.QAZA] / stats.totalPrayers) * 100).toFixed(1) : 0}%</p>
+                  </div>
+
+                  {/* Not Prayed */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-3">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                        style={{ backgroundColor: PRAYER_COLORS[PRAYER_STATUS.NOT_PRAYED] }}
+                      >
+                        {getPrayerStatusIcon(PRAYER_STATUS.NOT_PRAYED)}
+                      </div>
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-1">Not Prayed</h4>
+                    <p className="text-2xl font-bold text-gray-900">{stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED]}</p>
+                    <p className="text-sm text-gray-600">{stats.totalPrayers > 0 ? ((stats.prayerBreakdown[PRAYER_STATUS.NOT_PRAYED] / stats.totalPrayers) * 100).toFixed(1) : 0}%</p>
+                  </div>
+
+                  {/* Surah Al-Kahf tile (last) */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-3">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                        style={{ backgroundColor: '#7c3aed' }}
+                      >
+                        <Book className="w-6 h-6" />
+                      </div>
+                    </div>
+                    <h4 className="font-semibold text-gray-800 mb-1">Surah Al-Kahf</h4>
+                    <p className="text-2xl font-bold text-gray-900">{stats.surahAlKahfStats?.recited || 0}</p>
+                    <p className="text-sm text-gray-600">{(stats.surahAlKahfStats?.consistency || 0).toFixed(1)}%</p>
+                  </div>
+                </>
+              ) : (
+                // Standard mode: original four tiles
+                <>
+                  {Object.entries(stats.prayerBreakdown).map(([status, count]) => {
+                    const percentage = stats.totalPrayers > 0 ? (count / stats.totalPrayers * 100).toFixed(1) : 0;
+                    return (
+                      <div key={status} className="text-center">
+                        <div className="flex items-center justify-center mb-3">
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                            style={{ backgroundColor: PRAYER_COLORS[status] }}
+                          >
+                            {getPrayerStatusIcon(status)}
+                          </div>
+                        </div>
+                        <h4 className="font-semibold text-gray-800 mb-1">
+                          {status === PRAYER_STATUS.MASJID ? 'Masjid' :
+                           status === PRAYER_STATUS.HOME ? 'Home' :
+                           status === PRAYER_STATUS.QAZA ? 'Qaza' : 'Not Prayed'}
+                        </h4>
+                        <p className="text-2xl font-bold text-gray-900">{count}</p>
+                        <p className="text-sm text-gray-600">{percentage}%</p>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
 

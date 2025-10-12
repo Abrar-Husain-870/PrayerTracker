@@ -137,8 +137,11 @@ export const getDailyTrend = async (userId, startDate, endDate, masjidMode = fal
     const dayMasjidPct = (masjidCount / 5) * 100;
 
     // Composite score per day using the same weights
-    const maxPossibleAverage = 145; // 5 prayers * 27 + 10 on Friday if recited
-    const averageScoreNormalized = Math.min((dayScore / maxPossibleAverage) * 100, 100);
+    // Normalize against the correct max for that day:
+    // Non-Friday: 5 prayers * 27 = 135
+    // Friday: 5 prayers * 27 + 10 (Surah recited) = 145
+    const maxDaily = (27 * 5) + (isFriday(dateObj) ? 10 : 0);
+    const averageScoreNormalized = Math.min((dayScore / maxDaily) * 100, 100);
     const compositeScore = 
       (averageScoreNormalized * 0.5) +
       (dayConsistency * 0.25) +

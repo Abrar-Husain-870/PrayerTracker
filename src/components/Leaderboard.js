@@ -323,41 +323,49 @@ const Leaderboard = () => {
   };
 
   const calculateCompositeScore = (stats) => {
-    // Weighted Composite Score Algorithm
-    // Components: Average Score (50%), Consistency (25%), Current Streak (15%), Masjid % (10%)
-    
-    if (stats.totalDays === 0) return 0;
-    
-    // 1. Average Score Component (50% weight)
-    // Normalize to 0-100 scale (max possible average is 135 + 10 for Surah Al-Kahf = 145)
+    // New Composite Score Algorithm (100%)
+    // Average 45% | Consistency 20% | Streak 10% | Masjid%/Surah 10% | Days Tracked 15%
+    if (!stats) return 0;
+
+    // 1) Average (0..145 -> 0..100) @45%
     const maxPossibleAverage = 145;
-    const averageScoreNormalized = Math.min((stats.averageScore / maxPossibleAverage) * 100, 100);
-    const averageScoreComponent = averageScoreNormalized * 0.5;
-    
-    // 2. Consistency Component (25% weight)
-    // Already in 0-100 scale
-    const consistencyComponent = (stats.consistency || 0) * 0.25;
-    
-    // 3. Current Streak Component (15% weight)
-    // Normalize streak with diminishing returns (cap at 30 days for 100%)
-    const maxStreakForFull = 30;
-    const streakNormalized = Math.min((stats.currentStreak / maxStreakForFull) * 100, 100);
-    const streakComponent = streakNormalized * 0.15;
-    
-    // 4. Masjid Percentage Component (10% weight)
-    // Already in 0-100 scale
-    const masjidComponent = (stats.masjidPercentage || 0) * 0.1;
-    
-    // Calculate final composite score
-    const compositeScore = averageScoreComponent + consistencyComponent + streakComponent + masjidComponent;
-    
-    // Add small bonus for users with significant tracking history (minimum days bonus)
-    let historyBonus = 0;
-    if (stats.totalDays >= 30) historyBonus = 2;
-    else if (stats.totalDays >= 14) historyBonus = 1;
-    else if (stats.totalDays >= 7) historyBonus = 0.5;
-    
-    return Math.round((compositeScore + historyBonus) * 100) / 100; // Round to 2 decimal places
+    const avgNorm = Math.min((stats.averageScore || 0) / maxPossibleAverage, 1) * 100;
+    const avgComp = avgNorm * 0.45;
+
+    // 2) Consistency (0..100) @20%
+    const cons = Math.max(0, Math.min(stats.consistency || 0, 100));
+    const consComp = cons * 0.20;
+
+    // 3) Streak (cap 30 days) @10%
+    const streakNorm = Math.min((stats.currentStreak || 0) / 30, 1) * 100;
+    const streakComp = streakNorm * 0.10;
+
+    // 4) Masjid% or Surah Al-Kahf @10%
+    // Use local timePeriod state to choose behavior. Home Mode swaps Masjid% with Surah Al-Kahf consistency when available
+    let specialMetric = stats.masjidPercentage || 0;
+    if (stats.masjidMode) {
+      // Prefer surahAlKahfConsistency if provided; otherwise fallback to consistency
+      const surah = (stats.surahAlKahfConsistency != null) ? stats.surahAlKahfConsistency : null;
+      specialMetric = (surah != null) ? surah : (stats.consistency || 0);
+    }
+    specialMetric = Math.max(0, Math.min(specialMetric, 100));
+    const specialComp = specialMetric * 0.10;
+
+    // 5) Days Tracked (timeframe-aware cap) @15%
+    const now = new Date();
+    let cap = 60; // default
+    if (timePeriod === 'week') cap = 7;
+    else if (timePeriod === 'month') {
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      cap = new Date(year, month + 1, 0).getDate();
+    } else if (timePeriod === 'year') cap = 60;
+    else if (timePeriod === 'all') cap = 60;
+    const daysTrackedNorm = Math.min((stats.totalDays || 0) / cap, 1) * 100;
+    const daysTrackedComp = daysTrackedNorm * 0.15;
+
+    const total = avgComp + consComp + streakComp + specialComp + daysTrackedComp;
+    return Math.round(total * 100) / 100;
   };
 
   const calculateUserScore = async (userId, period) => {

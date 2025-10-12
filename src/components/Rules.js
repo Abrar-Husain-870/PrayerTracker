@@ -198,9 +198,15 @@ const Rules = () => {
               />
 
               <FormulaBox
-                title="Composite Score (Leaderboard)"
-                formula="(Average Score × 0.5) + (Consistency × 0.3) + (Streak × 0.15) + (Masjid % × 0.05)"
-                example="A balanced score considering all aspects of your prayer performance"
+                title="Composite Score (Leaderboard & Progress)"
+                formula="(Average × 45%) + (Consistency × 20%) + (Streak × 10%) + (Special × 10%) + (Days Tracked × 15%)"
+                example="Special = Masjid% (Standard Mode) OR Surah Al‑Kahf Consistency (Home Mode; falls back to Consistency if no Fridays in the period). Days Tracked uses a timeframe-aware cap: week 7, last 30 days 30, month = days in month, year 60, all time 60."
+              />
+
+              <FormulaBox
+                title="Days Tracked (15%)"
+                formula="min(Total Days Tracked ÷ Cap, 1) × 100"
+                example="Cap depends on the selected period: Week 7, Last 30 Days 30, Month = days in that month, Year 60, All Time 60"
               />
             </div>
           </SectionCard>
@@ -395,10 +401,11 @@ const Rules = () => {
                 <div className="bg-white dark:bg-black rounded-lg p-4 border border-rose-200 dark:border-gray-800">
                   <h4 className="font-semibold text-rose-800 mb-2">Ranking Factors</h4>
                   <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                    <li>• Average Score (50%)</li>
-                    <li>• Consistency (30%)</li>
-                    <li>• Streak (15%)</li>
-                    <li>• Masjid % (5%)</li>
+                    <li>• Average Score (45%)</li>
+                    <li>• Consistency (20%)</li>
+                    <li>• Current Streak (10%)</li>
+                    <li>• Special (10%): Masjid % (Standard) or Surah Al‑Kahf Consistency (Home; falls back to Consistency if no Fridays)</li>
+                    <li>• Days Tracked (15%) — timeframe-aware cap (Week 7, 30D 30, Month days-in-month, Year 60, All 60)</li>
                   </ul>
                 </div>
               </div>
