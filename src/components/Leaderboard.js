@@ -885,7 +885,7 @@ const Leaderboard = () => {
       fetchFriendRequests();
     });
     return () => unsub();
-  }, [currentUser?.uid, fetchUserFriends, fetchFriendRequests]);
+  }, [currentUser, fetchUserFriends, fetchFriendRequests]);
 
   const searchUsers = useCallback(async (searchTerm) => {
     if (!searchTerm.trim()) {
