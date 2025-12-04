@@ -11,11 +11,13 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import UpdateNotification from './components/UpdateNotification';
 import { LogOut, User, Calendar, TrendingUp, Trophy, BookOpen, Sun, Moon } from 'lucide-react';
 import './App.css';
+import { OnlineStatusProvider, useOnlineStatus } from './contexts/OnlineStatusContext';
 
 function AppContent() {
   const { currentUser, logout, userNickname } = useAuth();
   const [currentPage, setCurrentPage] = useState('calendar');
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { online } = useOnlineStatus();
 
   const handleLogout = async () => {
     try {
@@ -158,6 +160,15 @@ function AppContent() {
         {renderCurrentPage()}
       </main>
 
+      {/* Offline banner */}
+      {!online && (
+        <div className="mx-3 sm:mx-auto max-w-3xl mb-2">
+          <div className="rounded-lg border text-xs sm:text-sm px-3 py-2 bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#0a0a0a] dark:border-gray-800 dark:text-amber-300">
+            You are offline. View-only mode: edits are disabled until connection is restored.
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <footer className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
         <p>Build your spiritual discipline, one prayer at a time</p>
@@ -173,7 +184,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <OnlineStatusProvider>
+          <AppContent />
+        </OnlineStatusProvider>
       </AuthProvider>
     </ThemeProvider>
   );

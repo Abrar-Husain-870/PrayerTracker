@@ -8,6 +8,22 @@ import {
 import { db } from '../firebase/config';
 import { PRAYER_TYPES, PRAYER_STATUS, PRAYER_SCORES, SURAH_ALKAHF, SURAH_STATUS, SURAH_SCORES, isFriday } from './prayerService';
 
+// Lightweight in-memory cache with TTL to avoid refetching on navigation
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const _cache = new Map();
+const _now = () => Date.now();
+const _key = (name, payload) => `${name}:${JSON.stringify(payload)}`;
+const _get = (k) => {
+  const entry = _cache.get(k);
+  if (!entry) return undefined;
+  if (_now() - entry.t > entry.ttl) {
+    _cache.delete(k);
+    return undefined;
+  }
+  return entry.v;
+};
+const _set = (k, v, ttl = CACHE_TTL_MS) => _cache.set(k, { v, t: _now(), ttl });
+
 // Get all prayer data for a user within a date range
 export const getPrayerDataInRange = async (userId, startDate, endDate) => {
   try {
@@ -24,6 +40,10 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
     
     console.log('Data Range Debug - Querying range:', { startDateStr, endDateStr });
     
+    const cacheKey = _key('getPrayerDataInRange', { userId, startDateStr, endDateStr });
+    const cached = _get(cacheKey);
+    if (cached) return cached;
+
     const prayersRef = collection(db, 'users', userId, 'prayers');
     const q = query(
       prayersRef,
@@ -41,6 +61,7 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
     });
     
     console.log('Data Retrieval Debug - All retrieved data:', data);
+    _set(cacheKey, data);
     return data;
   } catch (error) {
     console.error('Error getting prayer data in range:', error);
@@ -50,6 +71,15 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
 
 // Build per-day trend series (only complete days are included)
 export const getDailyTrend = async (userId, startDate, endDate, masjidMode = false) => {
+  const cacheKey = _key('getDailyTrend', {
+    userId,
+    start: startDate?.toISOString?.() || startDate,
+    end: endDate?.toISOString?.() || endDate,
+    masjidMode
+  });
+  const cached = _get(cacheKey);
+  if (cached) return cached;
+
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
   const dates = Object.keys(prayerData).sort();
 
@@ -155,6 +185,7 @@ export const getDailyTrend = async (userId, startDate, endDate, masjidMode = fal
     });
   });
 
+  _set(cacheKey, series);
   return series;
 };
 
@@ -409,18 +440,30 @@ export const calculatePrayerStats = (prayerData, masjidMode = false) => {
 export const getMonthlyStats = async (userId, year, month, masjidMode = false) => {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0); // Last day of month
-  
+
+  const cacheKey = _key('getMonthlyStats', { userId, year, month, masjidMode });
+  const cached = _get(cacheKey);
+  if (cached) return cached;
+
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData, masjidMode);
+  const result = calculatePrayerStats(prayerData, masjidMode);
+  _set(cacheKey, result);
+  return result;
 };
 
 // Get yearly statistics
 export const getYearlyStats = async (userId, year, masjidMode = false) => {
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31);
-  
+
+  const cacheKey = _key('getYearlyStats', { userId, year, masjidMode });
+  const cached = _get(cacheKey);
+  if (cached) return cached;
+
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData, masjidMode);
+  const result = calculatePrayerStats(prayerData, masjidMode);
+  _set(cacheKey, result);
+  return result;
 };
 
 // Get last N days statistics
@@ -428,14 +471,24 @@ export const getRecentStats = async (userId, days = 30, masjidMode = false) => {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days + 1);
-  
+
+  const cacheKey = _key('getRecentStats', { userId, days, masjidMode });
+  const cached = _get(cacheKey);
+  if (cached) return cached;
+
   const prayerData = await getPrayerDataInRange(userId, startDate, endDate);
-  return calculatePrayerStats(prayerData, masjidMode);
+  const result = calculatePrayerStats(prayerData, masjidMode);
+  _set(cacheKey, result, 2 * 60 * 1000); // 2 min TTL for recent to be a bit fresher
+  return result;
 };
 
 // Get all time statistics (all historical data)
 export const getAllTimeStats = async (userId, masjidMode = false) => {
   try {
+    const cacheKey = _key('getAllTimeStats', { userId, masjidMode });
+    const cached = _get(cacheKey);
+    if (cached) return cached;
+
     // Fetch all prayer documents for this user without date restrictions
     const prayersRef = collection(db, 'users', userId, 'prayers');
     const querySnapshot = await getDocs(prayersRef);
@@ -445,7 +498,9 @@ export const getAllTimeStats = async (userId, masjidMode = false) => {
       allPrayerData[doc.id] = doc.data();
     });
     
-    return calculatePrayerStats(allPrayerData, masjidMode);
+    const result = calculatePrayerStats(allPrayerData, masjidMode);
+    _set(cacheKey, result);
+    return result;
   } catch (error) {
     console.error('Error fetching all time stats:', error);
     // Fallback to empty stats if error occurs

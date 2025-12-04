@@ -13,7 +13,8 @@ import {
   Shield,
   Eye,
   EyeOff,
-  Building
+  Building,
+  Lock
 } from 'lucide-react';
 import RefreshAppButton from './RefreshAppButton';
 import { 
@@ -27,10 +28,12 @@ import {
 } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import { db } from '../firebase/config';
-import { getYearlyStats } from '../services/analyticsService';
+import { getYearlyStats, getAllTimeStats } from '../services/analyticsService';
+import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 
 const Profile = () => {
   const { currentUser, logout, getUserNickname, refreshNickname, userNickname: contextNickname } = useAuth();
+  const { online } = useOnlineStatus();
   const [userNickname, setUserNickname] = useState('');
   const [editingNickname, setEditingNickname] = useState(false);
   const [newNickname, setNewNickname] = useState('');
@@ -71,17 +74,10 @@ const [userToDelete, setUserToDelete] = useState(null);
             });
           }
           
-          // Calculate total days tracked
-          const currentYear = new Date().getFullYear();
-          let totalDays = 0;
-          
-          // Check last 2 years for tracked days
-          for (let year = currentYear - 1; year <= currentYear; year++) {
-            const yearStats = await getYearlyStats(currentUser.uid, year);
-            totalDays += yearStats.totalDays;
-          }
-          
-          setTotalDaysTracked(totalDays);
+          // Total days tracked (aligned with Progress/Leaderboard logic)
+          // Use all-time stats so it works with Firestore offline cache too
+          const allStats = await getAllTimeStats(currentUser.uid, isMasjidModeEnabled);
+          setTotalDaysTracked(allStats.totalDays || 0);
         } catch (error) {
           console.error('Error fetching user data:', error);
         }
@@ -97,6 +93,7 @@ const [userToDelete, setUserToDelete] = useState(null);
   };
 
   const handleNicknameSave = async () => {
+    if (!online) return;
     if (!newNickname.trim()) return;
     
     try {
@@ -125,6 +122,7 @@ const [userToDelete, setUserToDelete] = useState(null);
   };
 
   const handlePrivacyToggle = async () => {
+    if (!online) return;
     try {
       setLoading(true);
       const userDocRef = doc(db, 'users', currentUser.uid);
@@ -148,6 +146,7 @@ const [userToDelete, setUserToDelete] = useState(null);
   };
 
   const handleMasjidModeToggle = async () => {
+    if (!online) return;
     try {
       setLoading(true);
       const userDocRef = doc(db, 'users', currentUser.uid);
@@ -171,6 +170,7 @@ const [userToDelete, setUserToDelete] = useState(null);
   };
 
   const clearUserData = async (type) => {
+    if (!online) return;
     try {
       setLoading(true);
       const batch = writeBatch(db);
@@ -278,6 +278,11 @@ const [userToDelete, setUserToDelete] = useState(null);
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
+      {!online && (
+        <div className="rounded-lg border text-xs px-3 py-2 bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#0a0a0a] dark:border-gray-800 dark:text-amber-300 flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5" /> Offline: view-only. Edits disabled until connection is restored.
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl p-6">
         <h1 className="text-2xl font-bold mb-2">Profile</h1>
@@ -307,8 +312,8 @@ const [userToDelete, setUserToDelete] = useState(null);
                   />
                   <button
                     onClick={handleNicknameSave}
-                    disabled={loading}
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                    disabled={loading || !online}
+                    className={`p-2 rounded-lg ${!online ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:bg-green-50'}`}
                   >
                     <Save className="w-4 h-4" />
                   </button>
@@ -371,10 +376,11 @@ const [userToDelete, setUserToDelete] = useState(null);
               </div>
               <button
                 onClick={handlePrivacyToggle}
-                disabled={loading}
+                disabled={loading || !online}
+                title={!online ? 'Offline: view-only' : ''}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                   isPrivacyEnabled ? 'bg-primary-600' : 'bg-gray-300'
-                }`}
+                } ${!online ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <span
                   className={`absolute h-4 w-4 rounded-full bg-white transition-all duration-200 ease-in-out ${
@@ -414,10 +420,11 @@ const [userToDelete, setUserToDelete] = useState(null);
               </div>
               <button
                 onClick={handleMasjidModeToggle}
-                disabled={loading}
+                disabled={loading || !online}
+                title={!online ? 'Offline: view-only' : ''}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                   isMasjidModeEnabled ? 'bg-green-600' : 'bg-gray-300'
-                }`}
+                } ${!online ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <span
                   className={`absolute h-4 w-4 rounded-full bg-white transition-all duration-200 ease-in-out ${
@@ -455,19 +462,25 @@ const [userToDelete, setUserToDelete] = useState(null);
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <button
               onClick={() => openClearDataModal('month')}
-              className="p-3 border border-yellow-300 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors"
+              disabled={!online}
+              title={!online ? 'Offline: view-only' : ''}
+              className={`p-3 border text-yellow-700 rounded-lg transition-colors ${!online ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-yellow-300 hover:bg-yellow-50'}`}
             >
               Clear Month Data
             </button>
             <button
               onClick={() => openClearDataModal('year')}
-              className="p-3 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 transition-colors"
+              disabled={!online}
+              title={!online ? 'Offline: view-only' : ''}
+              className={`p-3 border text-orange-700 rounded-lg transition-colors ${!online ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-orange-300 hover:bg-orange-50'}`}
             >
               Clear Year Data
             </button>
             <button
               onClick={() => openClearDataModal('all')}
-              className="p-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors"
+              disabled={!online}
+              title={!online ? 'Offline: view-only' : ''}
+              className={`p-3 border text-red-700 rounded-lg transition-colors ${!online ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-red-300 hover:bg-red-50'}`}
             >
               Clear All Data
             </button>
@@ -487,7 +500,9 @@ const [userToDelete, setUserToDelete] = useState(null);
           
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+            disabled={!online}
+            title={!online ? 'Offline: view-only' : ''}
+            className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 ${!online ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
           >
             <Trash2 className="w-4 h-4" />
             Delete Account

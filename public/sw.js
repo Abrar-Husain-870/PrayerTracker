@@ -1,5 +1,5 @@
 // Dynamic cache version - this will be updated automatically on each build
-const CACHE_VERSION = 'v2025-12-04-1511'; // Will be replaced by build process
+const CACHE_VERSION = 'v2025-12-04-1538'; // Will be replaced by build process
 const STATIC_CACHE = `namaaz-tracker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `namaaz-tracker-dynamic-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `namaaz-tracker-runtime-${CACHE_VERSION}`;

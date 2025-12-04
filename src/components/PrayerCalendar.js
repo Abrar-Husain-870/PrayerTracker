@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
-import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -19,9 +19,11 @@ import {
 import PrayerStatusTile from './PrayerStatusTile'; // Import the new component
 import 'react-calendar/dist/Calendar.css';
 import './PrayerCalendar.css'; // Import custom styles
+import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 
 const PrayerCalendar = () => {
   const { currentUser } = useAuth();
+  const { online } = useOnlineStatus();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthData, setMonthData] = useState({});
@@ -103,6 +105,7 @@ const PrayerCalendar = () => {
 
   const handlePrayerStatusChange = async (prayer, status) => {
     if (!currentUser) return;
+    if (!online) return; // guard writes when offline
 
     try {
       const localDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
@@ -242,10 +245,21 @@ const PrayerCalendar = () => {
                     )}
                   </span>
                   
+                  {!online && (
+                    <span title="Offline: view-only" className="text-gray-400 dark:text-gray-500">
+                      <Lock className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+
                   <select
                     value={status || ""}
                     onChange={(e) => handlePrayerStatusChange(prayer, e.target.value)}
-                    className="text-sm border border-gray-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
+                    disabled={!online}
+                    className={`text-sm border rounded px-2 py-1 focus:outline-none focus:ring-2 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 ${
+                      !online
+                        ? 'border-gray-200 dark:border-gray-800 opacity-60 cursor-not-allowed'
+                        : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500'
+                    }`}
                   >
                     <option value="">-- Select --</option>
                     <option value="clear">Clear</option>
@@ -293,10 +307,21 @@ const PrayerCalendar = () => {
                   )}
                 </span>
                 
+                {!online && (
+                  <span title="Offline: view-only" className="text-gray-400 dark:text-gray-500">
+                    <Lock className="w-3.5 h-3.5" />
+                  </span>
+                )}
+
                 <select
                   value={(selectedDayData && selectedDayData[SURAH_ALKAHF]) || ""}
                   onChange={(e) => handlePrayerStatusChange(SURAH_ALKAHF, e.target.value)}
-                  className="text-sm border border-purple-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100"
+                  disabled={!online}
+                  className={`text-sm border rounded px-2 py-1 focus:outline-none bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 ${
+                    !online
+                      ? 'border-gray-200 dark:border-gray-800 opacity-60 cursor-not-allowed'
+                      : 'border-purple-300 dark:border-gray-700 focus:ring-2 focus:ring-purple-500'
+                  }`}
                 >
                   <option value="">-- Select --</option>
                   <option value="clear">Clear</option>
