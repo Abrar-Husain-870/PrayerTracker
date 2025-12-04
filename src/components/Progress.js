@@ -891,7 +891,7 @@ const Progress = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 col-span-2 md:col-span-1 glass-card">
+            <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-6 shadow-lg border border-gray-100 glass-card">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-xs sm:text-sm font-medium">Average Score</p>

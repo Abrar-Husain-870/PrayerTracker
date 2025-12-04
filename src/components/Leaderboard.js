@@ -20,7 +20,8 @@ import {
   TrendingDown,
   Minus,
   X,
-  Clock
+  Clock,
+  Lock
 } from 'lucide-react';
 import { 
   collection, 
@@ -35,9 +36,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { getMonthlyStats, getYearlyStats, calculatePrayerStats, getPrayerDataInRange } from '../services/analyticsService';
+import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 
 const Leaderboard = () => {
   const { currentUser, getUserNickname } = useAuth();
+  const { online } = useOnlineStatus();
   const [activeTab, setActiveTab] = useState('global'); // 'global', 'friends', or 'requests'
   const [timePeriod, setTimePeriod] = useState('all'); // Default to 'all' (All Time)
   const [masjidModeFilter, setMasjidModeFilter] = useState('all'); // 'all', 'on', 'off'
@@ -73,12 +76,27 @@ const Leaderboard = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchLeaderboardData();
-      fetchUserFriends();
-      fetchFriendRequests();
+    if (!currentUser) return;
+    const cacheKey = `lb_cache_${currentUser.uid}_${timePeriod}_${masjidModeFilter}`;
+    if (!online) {
+      // Try to show last cached leaderboard to avoid infinite loading
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setLeaderboardData(parsed.leaderboardData || []);
+          setCurrentUserStats(parsed.currentUserStats || null);
+          setCurrentUserRank(parsed.currentUserRank || null);
+        } catch {}
+      }
+      setLoading(false);
+      return;
     }
-  }, [currentUser, timePeriod, masjidModeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Online: fetch fresh
+    fetchLeaderboardData();
+    fetchUserFriends();
+    fetchFriendRequests();
+  }, [currentUser, timePeriod, masjidModeFilter, online]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (showAddFriend && searchInputRef.current) {
@@ -632,7 +650,20 @@ const Leaderboard = () => {
       setCurrentUserRank(currentUserIndex >= 0 ? currentUserIndex + 1 : null);
       
       // Take top 100 for global leaderboard (filtered by privacy and masjid mode)
-      setLeaderboardData(publicUsers.slice(0, 100));
+      const top = publicUsers.slice(0, 100);
+      setLeaderboardData(top);
+
+      // Persist cache for offline use
+      if (currentUser?.uid) {
+        const cacheKey = `lb_cache_${currentUser.uid}_${timePeriod}_${masjidModeFilter}`;
+        const payload = {
+          ts: Date.now(),
+          leaderboardData: top,
+          currentUserStats,
+          currentUserRank
+        };
+        try { localStorage.setItem(cacheKey, JSON.stringify(payload)); } catch {}
+      }
       
     } catch (error) {
       console.error('Error fetching leaderboard data:', error);
@@ -755,7 +786,7 @@ const Leaderboard = () => {
       console.error('Error fetching user friends:', error);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid, getUserNickname]);
+  }, [currentUser?.uid, getUserNickname, online]);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -888,6 +919,7 @@ const Leaderboard = () => {
   // };
 
   const sendFriendRequest = useCallback(async (userToAdd) => {
+    if (!online) { showNotification('error', 'Offline: view-only'); return; }
     try {
       const currentUserNickname = await getUserNickname(currentUser.uid);
       
@@ -928,9 +960,10 @@ const Leaderboard = () => {
       console.error('Error sending friend request:', error);
       showNotification('error', 'Failed to send friend request. Please try again.');
     }
-  }, [currentUser?.uid, getUserNickname, userFriends, friendRequestsSent, fetchFriendRequests, showNotification]);
+  }, [currentUser?.uid, getUserNickname, userFriends, friendRequestsSent, fetchFriendRequests, showNotification, online]);
 
   const acceptFriendRequest = useCallback(async (requesterId) => {
+    if (!online) { showNotification('error', 'Offline: view-only'); return; }
     try {
       const currentUserNickname = await getUserNickname(currentUser.uid);
       
@@ -970,7 +1003,7 @@ const Leaderboard = () => {
       console.error('Error accepting friend request:', error);
       showNotification('error', 'Failed to accept friend request. Please try again.');
     }
-  }, [currentUser?.uid, getUserNickname, fetchUserFriends, fetchFriendRequests, showNotification]);
+  }, [currentUser?.uid, getUserNickname, fetchUserFriends, fetchFriendRequests, showNotification, online]);
 
   const declineFriendRequest = async (requesterId) => {
     try {
@@ -1021,6 +1054,7 @@ const Leaderboard = () => {
   };
 
   const removeFriend = async (friendNickname) => {
+    if (!online) { showNotification('error', 'Offline: view-only'); return; }
     try {
       const currentUserNickname = await getUserNickname(currentUser.uid);
       
@@ -1484,8 +1518,9 @@ const Leaderboard = () => {
             // Already friends - show remove button
             <button
               onClick={() => removeFriend(user.nickname)}
-              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
-              title={`Remove ${user.nickname} from friends`}
+              disabled={!online}
+              className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${!online ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+              title={!online ? 'Offline: view-only' : `Remove ${user.nickname} from friends`}
             >
               <UserPlus className="w-3 h-3 rotate-45" />
               Remove Friend
@@ -1494,8 +1529,9 @@ const Leaderboard = () => {
             // Request already sent - show withdraw button
             <button
               onClick={() => withdrawFriendRequest(user.id)}
-              className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors flex items-center gap-1"
-              title="Withdraw friend request"
+              disabled={!online}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${!online ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+              title={!online ? 'Offline: view-only' : 'Withdraw friend request'}
             >
               <X className="w-3 h-3" />
               Withdraw Request
@@ -1505,27 +1541,28 @@ const Leaderboard = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => acceptFriendRequest(user.id)}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
-                title={`Accept friend request from ${user.nickname}`}
+                disabled={!online}
+                className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${!online ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                title={!online ? 'Offline: view-only' : `Accept request from ${user.nickname}`}
               >
-                <UserPlus className="w-3 h-3" />
                 Accept
               </button>
               <button
                 onClick={() => declineFriendRequest(user.id)}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
-                title={`Decline friend request from ${user.nickname}`}
+                disabled={!online}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${!online ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                title={!online ? 'Offline: view-only' : `Decline request from ${user.nickname}`}
               >
-                <X className="w-3 h-3" />
                 Decline
               </button>
             </div>
           ) : (
-            // No relationship - show add friend button
+            // Not friends yet - show add button
             <button
               onClick={() => sendFriendRequest(user)}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
-              title={`Send friend request to ${user.nickname}`}
+              disabled={!online}
+              className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${!online ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              title={!online ? 'Offline: view-only' : `Send friend request to ${user.nickname}`}
             >
               <UserPlus className="w-3 h-3" />
               Add Friend
@@ -1581,7 +1618,7 @@ const Leaderboard = () => {
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-purple-100 dark:bg-black dark:border-gray-800">
+      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <div className="flex flex-col gap-4 items-start justify-between">
           {/* Tab Selection */}
           <div className="flex flex-wrap gap-1 sm:gap-2 w-full">
@@ -1716,7 +1753,7 @@ const Leaderboard = () => {
                     {searchLoading ? (
                       <div className="text-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto"></div>
-                        <p className="text-gray-500 mt-2 text-sm">Searching...</p>
+                        <p className="text-gray-500 mt-2">Searching...</p>
                       </div>
                     ) : searchResults.length > 0 ? (
                       <div className="space-y-2">
@@ -1735,15 +1772,12 @@ const Leaderboard = () => {
                             </div>
                             <button
                               onClick={() => sendFriendRequest(user)}
-                              className={`px-3 py-1 text-white text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                                friendRequestsSent.includes(user.id) 
-                                  ? 'bg-gray-500 cursor-not-allowed dark:bg-gray-600' 
-                                  : 'bg-green-600 hover:bg-green-700 dark:bg-green-800 dark:hover:bg-green-900'
-                              }`}
-                              disabled={friendRequestsSent.includes(user.id)}
+                              disabled={friendRequestsSent.includes(user.id) || !online}
+                              title={!online ? 'Offline: view-only' : (friendRequestsSent.includes(user.id) ? 'Request already sent' : 'Send friend request')}
+                              className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${(!online || friendRequestsSent.includes(user.id)) ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                             >
                               <UserPlus className="w-3 h-3" />
-                              {friendRequestsSent.includes(user.id) ? 'Request Sent' : 'Send Request'}
+                              {friendRequestsSent.includes(user.id) ? 'Request Sent' : (!online ? 'Offline' : 'Send Request')}
                             </button>
                           </div>
                         ))}
