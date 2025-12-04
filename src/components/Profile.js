@@ -85,7 +85,7 @@ const [userToDelete, setUserToDelete] = useState(null);
     };
 
     fetchUserData();
-  }, [currentUser, getUserNickname, contextNickname]);
+  }, [currentUser, getUserNickname, contextNickname, isMasjidModeEnabled]);
 
   const handleNicknameEdit = () => {
     setEditingNickname(true);
