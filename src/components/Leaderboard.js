@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { DEBUG_LOGS_ENABLED } from '../config/debug';
 import { 
   Trophy, 
   Medal, 
@@ -32,7 +33,8 @@ import {
   updateDoc, 
   arrayUnion, 
   arrayRemove,
-  where 
+  where,
+  onSnapshot 
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { getMonthlyStats, getYearlyStats, calculatePrayerStats, getPrayerDataInRange } from '../services/analyticsService';
@@ -97,6 +99,8 @@ const Leaderboard = () => {
     fetchUserFriends();
     fetchFriendRequests();
   }, [currentUser, timePeriod, masjidModeFilter, online]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  
 
   useEffect(() => {
     if (showAddFriend && searchInputRef.current) {
@@ -184,7 +188,7 @@ const Leaderboard = () => {
   }, [timePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bar Graph Component for Friends Comparison
-  const FriendsMetricBarGraph = ({ friends, currentUser }) => {
+  const FriendsMetricBarGraph = React.memo(({ friends, currentUser }) => {
     if (!friends || friends.length === 0) return null;
 
     // Include current user in comparison if they have data
@@ -306,7 +310,7 @@ const Leaderboard = () => {
         </div>
       </div>
     );
-  };
+  });
 
   const calculateDaysSinceLastActivity = async (userId) => {
     try {
@@ -717,31 +721,36 @@ const Leaderboard = () => {
         }
         
         // Update Firestore if we found issues
-        if (validatedFriends.length !== friends.length) {
-          console.log('Cleaning up friends list:', { 
-            original: friends, 
-            afterDedup: uniqueFriends,
-            afterValidation: validatedFriends 
-          });
-          await updateDoc(userDocRef, { friends: validatedFriends });
-        }
+        // Do not mutate Firestore during fetch; only validate for display
+        setUserFriends(uniqueFriends);
         
-        setUserFriends(validatedFriends);
-        
-        // Fetch friends' data
-        if (validatedFriends.length > 0) {
+        // Fetch friends' data (batch lookups by nickname using 'in' queries in chunks of 10)
+        if (uniqueFriends.length > 0) {
+          const usersRef = collection(db, 'users');
+          const chunk = (arr, size) => {
+            const out = [];
+            for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+            return out;
+          };
+          const chunks = chunk(uniqueFriends, 10);
+          const friendDocs = [];
+          for (const names of chunks) {
+            try {
+              const q = query(usersRef, where('nickname', 'in', names));
+              const snap = await getDocs(q);
+              friendDocs.push(...snap.docs);
+            } catch (e) {
+              // Fallback for any chunk errors (e.g., empty names) - skip
+              console.error('Batch friend fetch error:', e);
+            }
+          }
+          const byNickname = new Map(friendDocs.map(d => [(d.data() || {}).nickname, d]));
           const friendsWithScores = await Promise.all(
-            validatedFriends.map(async (friendNickname) => {
-              // Find user by nickname
-              const usersRef = collection(db, 'users');
-              const friendQuery = query(usersRef, where('nickname', '==', friendNickname));
-              const friendSnapshot = await getDocs(friendQuery);
-              
-              if (!friendSnapshot.empty) {
-                const friendDoc = friendSnapshot.docs[0];
+            uniqueFriends.map(async (friendNickname) => {
+              const friendDoc = byNickname.get(friendNickname);
+              if (friendDoc) {
                 const friendData = friendDoc.data();
                 const stats = await calculateUserScore(friendDoc.id, timePeriod);
-                
                 return {
                   id: friendDoc.id,
                   nickname: friendData.nickname,
@@ -787,6 +796,31 @@ const Leaderboard = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, getUserNickname, online]);
+
+  // Debug-only recovery helper: rebuild current user's friends from reverse links
+  useEffect(() => {
+    if (!DEBUG_LOGS_ENABLED) return;
+    if (!currentUser) return;
+    window.recoverFriends = async () => {
+      try {
+        const myNickname = await getUserNickname(currentUser.uid);
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('friends', 'array-contains', myNickname));
+        const snap = await getDocs(q);
+        const nicknames = snap.docs
+          .map(d => (d.data() || {}).nickname)
+          .filter(n => n && n !== myNickname);
+        await updateDoc(doc(db, 'users', currentUser.uid), { friends: nicknames });
+        console.log('Recovered friends from reverse links:', nicknames);
+        fetchUserFriends();
+      } catch (e) {
+        console.error('recoverFriends failed:', e);
+      }
+    };
+    if (DEBUG_LOGS_ENABLED) {
+      console.log('Debug helper attached: window.recoverFriends()');
+    }
+  }, [currentUser, getUserNickname, fetchUserFriends]);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -834,25 +868,7 @@ const Leaderboard = () => {
           }
         }
         
-        // Update if we found issues (duplicates or orphaned requests)
-        if (validatedSentRequests.length !== sentRequests.length || 
-            validatedReceivedRequests.length !== receivedRequests.length) {
-          console.log('Cleaning up friend requests:', { 
-            sentOriginal: sentRequests, 
-            sentAfterDedup: uniqueSentRequests,
-            sentAfterValidation: validatedSentRequests,
-            receivedOriginal: receivedRequests,
-            receivedAfterDedup: uniqueReceivedRequests,
-            receivedAfterValidation: validatedReceivedRequests
-          });
-          await updateDoc(userDocRef, { 
-            friendRequestsSent: validatedSentRequests,
-            friendRequestsReceived: validatedReceivedRequests
-          });
-        }
-        
-        // Set validated friend requests state
-        
+        // Do not mutate Firestore during fetch; only set UI state
         setFriendRequestsSent(validatedSentRequests);
         setFriendRequestsReceived(validatedReceivedRequests);
       }
@@ -860,6 +876,16 @@ const Leaderboard = () => {
       console.error('Error fetching friend requests:', error);
     }
   }, [currentUser?.uid]);
+
+  // Real-time updates for friends and friend requests using onSnapshot (placed after hooks to avoid TDZ)
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = onSnapshot(doc(db, 'users', currentUser.uid), () => {
+      fetchUserFriends();
+      fetchFriendRequests();
+    });
+    return () => unsub();
+  }, [currentUser?.uid, fetchUserFriends, fetchFriendRequests]);
 
   const searchUsers = useCallback(async (searchTerm) => {
     if (!searchTerm.trim()) {
@@ -1006,6 +1032,7 @@ const Leaderboard = () => {
   }, [currentUser?.uid, getUserNickname, fetchUserFriends, fetchFriendRequests, showNotification, online]);
 
   const declineFriendRequest = async (requesterId) => {
+    if (!online) { showNotification('error', 'Offline: view-only'); return; }
     try {
       // Remove request from both users
       const currentUserDocRef = doc(db, 'users', currentUser.uid);
@@ -1620,6 +1647,11 @@ const Leaderboard = () => {
       {/* Controls */}
       <div className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-purple-100 dark:border-gray-800">
         <div className="flex flex-col gap-4 items-start justify-between">
+          {!online && (
+            <div className="w-full rounded-lg border text-xs sm:text-sm px-3 py-2 bg-amber-50 border-amber-200 text-amber-800 dark:bg-[#0a0a0a] dark:border-gray-800 dark:text-amber-300">
+              Showing last fetched results. You are offline; results may differ.
+            </div>
+          )}
           {/* Tab Selection */}
           <div className="flex flex-wrap gap-1 sm:gap-2 w-full">
             <button

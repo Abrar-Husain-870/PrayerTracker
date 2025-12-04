@@ -381,7 +381,8 @@ const Progress = () => {
   const isDark = resolvedTheme === 'dark';
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false;
   const pieBorderColor = isDark ? '#0a0a0a' : '#ffffff';
-  const prayerBreakdownData = stats ? (() => {
+  const prayerBreakdownData = React.useMemo(() => {
+    if (!stats) return null;
     if (masjidMode) {
       // Home Prayer Mode: custom order and slices per request
       // New order (clockwise from top): Perfect Days (green), Prayed (blue), Qaza (yellow), Not Prayed (red)
@@ -434,9 +435,10 @@ const Progress = () => {
         },
       ],
     };
-  })() : null;
+  }, [stats, masjidMode, pieBorderColor]);
 
-  const prayerTypeData = stats ? (() => {
+  const prayerTypeData = React.useMemo(() => {
+    if (!stats) return null;
     const labels = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     if (masjidMode) {
       return {
@@ -499,7 +501,7 @@ const Progress = () => {
         },
       ],
     };
-  })() : null;
+  }, [stats, masjidMode]);
 
   const chartOptions = {
     responsive: true,
@@ -517,14 +519,17 @@ const Progress = () => {
     const [yy, mm, dd] = iso.split('-').map(Number);
     return `${dd}/${mm}/${String(yy).slice(2)}`;
   };
-  const trendLabels = (cumulativeTrend.length > 0 ? cumulativeTrend : dailyTrend).map(p => formatShortDate(p.date));
+  const trendLabels = React.useMemo(() => {
+    const source = (cumulativeTrend.length > 0 ? cumulativeTrend : dailyTrend);
+    return source.map(p => formatShortDate(p.date));
+  }, [cumulativeTrend, dailyTrend]);
   // Use leaderboard-style cumulative series when available, otherwise fallback to per-day values
-  const trendDataValues = (() => {
+  const trendDataValues = React.useMemo(() => {
     if (cumulativeTrend.length > 0) {
       return trendType === 'average' ? cumulativeTrend.map(p => p.avg) : cumulativeTrend.map(p => p.comp);
     }
     return trendType === 'average' ? dailyTrend.map(p => p.averageScore) : dailyTrend.map(p => p.compositeScore);
-  })();
+  }, [cumulativeTrend, dailyTrend, trendType]);
 
   // Compute moving average for smoothing
   const movingAverage = (values, windowSize = 7) => {
@@ -538,45 +543,46 @@ const Progress = () => {
     }
     return result;
   };
-  const smoothedValues = movingAverage(trendDataValues, trendType === 'average' ? 5 : 7);
+  const smoothedValues = React.useMemo(() => movingAverage(trendDataValues, trendType === 'average' ? 5 : 7), [trendDataValues, trendType]);
   const primaryStroke = isDark ? '#60a5fa' : '#3b82f6'; // blue-500/400
   const primaryFill = isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.12)';
 
   // Dynamic Y-axis range based on visible series (smoothed or raw)
-  const valuesForScale = (smooth ? smoothedValues : trendDataValues).filter(v => Number.isFinite(v));
-  let dynMin = trendType === 'average' ? 0 : 0;
-  let dynMax = trendType === 'average' ? 145 : 100;
-  if (valuesForScale.length > 0) {
-    const vmin = Math.min(...valuesForScale);
-    const vmax = Math.max(...valuesForScale);
-    const span = Math.max(1, vmax - vmin);
-    const pad = Math.max(span * 0.12, trendType === 'average' ? 3 : 2);
-    let minY = vmin - pad;
-    let maxY = vmax + pad;
-    if (trendType === 'composite') {
-      minY = Math.max(0, minY);
-      maxY = Math.min(100, maxY);
-      // Ensure we still have some span
-      if (maxY - minY < 10) {
-        const add = (10 - (maxY - minY)) / 2;
-        minY = Math.max(0, minY - add);
-        maxY = Math.min(100, maxY + add);
+  const { dynMin, dynMax } = React.useMemo(() => {
+    const vals = (smooth ? smoothedValues : trendDataValues).filter(v => Number.isFinite(v));
+    let minOut = trendType === 'average' ? 0 : 0;
+    let maxOut = trendType === 'average' ? 145 : 100;
+    if (vals.length > 0) {
+      const vmin = Math.min(...vals);
+      const vmax = Math.max(...vals);
+      const span = Math.max(1, vmax - vmin);
+      const pad = Math.max(span * 0.12, trendType === 'average' ? 3 : 2);
+      let minY = vmin - pad;
+      let maxY = vmax + pad;
+      if (trendType === 'composite') {
+        minY = Math.max(0, minY);
+        maxY = Math.min(100, maxY);
+        if (maxY - minY < 10) {
+          const add = (10 - (maxY - minY)) / 2;
+          minY = Math.max(0, minY - add);
+          maxY = Math.min(100, maxY + add);
+        }
+      } else {
+        minY = Math.max(0, minY);
+        maxY = Math.min(150, maxY);
+        if (maxY - minY < 10) {
+          const add = (10 - (maxY - minY)) / 2;
+          minY = Math.max(0, minY - add);
+          maxY = Math.min(150, maxY + add);
+        }
       }
-    } else {
-      // Average scores - typical bounds ~0..150
-      minY = Math.max(0, minY);
-      maxY = Math.min(150, maxY);
-      if (maxY - minY < 10) {
-        const add = (10 - (maxY - minY)) / 2;
-        minY = Math.max(0, minY - add);
-        maxY = Math.min(150, maxY + add);
-      }
+      minOut = minY;
+      maxOut = maxY;
     }
-    dynMin = minY;
-    dynMax = maxY;
-  }
+    return { dynMin: minOut, dynMax: maxOut };
+  }, [smooth, smoothedValues, trendDataValues, trendType]);
 
-  const trendData = {
+  const trendData = React.useMemo(() => ({
     labels: trendLabels,
     datasets: [
       {
@@ -595,7 +601,7 @@ const Progress = () => {
         borderWidth: 2,
       }
     ]
-  };
+  }), [trendLabels, trendType, smooth, smoothedValues, trendDataValues, primaryStroke, primaryFill]);
 
   const trendOptions = {
     responsive: true,

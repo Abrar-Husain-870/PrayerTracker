@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Calendar from 'react-calendar';
 import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,10 +12,10 @@ import {
   SURAH_STATUS,
   SURAH_COLORS,
   savePrayerStatus,
-  getPrayerDataForMonth,
   calculateDayScore,
   isFriday
 } from '../services/prayerService';
+import { getPrayerDataInRange } from '../services/analyticsService';
 import PrayerStatusTile from './PrayerStatusTile'; // Import the new component
 import 'react-calendar/dist/Calendar.css';
 import './PrayerCalendar.css'; // Import custom styles
@@ -27,6 +27,7 @@ const PrayerCalendar = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthData, setMonthData] = useState({});
+  const monthChangeTimer = useRef(null);
   const [selectedDayData, setSelectedDayData] = useState({});
   const [masjidMode, setMasjidMode] = useState(false);
 
@@ -48,11 +49,16 @@ const PrayerCalendar = () => {
     fetchMasjidMode();
   }, [currentUser]);
 
-  // Load month data when the component mounts or the user/month changes
+  // Load calendar-range data when user or visible month changes (debounced)
   useEffect(() => {
-    if (currentUser) {
+    if (!currentUser) return;
+    if (monthChangeTimer.current) clearTimeout(monthChangeTimer.current);
+    monthChangeTimer.current = setTimeout(() => {
       loadMonthData();
-    }
+    }, 150);
+    return () => {
+      if (monthChangeTimer.current) clearTimeout(monthChangeTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, currentMonth]);
 
@@ -76,28 +82,9 @@ const PrayerCalendar = () => {
       const endOfCalendarView = new Date(lastDayOfMonth);
       endOfCalendarView.setDate(endOfCalendarView.getDate() + (6 - lastDayOfMonth.getDay()));
 
-      let allData = {};
-      
-      // Future-proof month iteration: collect all unique months in calendar view
-      const monthsToLoad = new Set();
-      let tempDate = new Date(startOfCalendarView);
-      
-      // Iterate through each day in calendar view to find all months
-      while (tempDate <= endOfCalendarView) {
-        const monthKey = `${tempDate.getFullYear()}-${tempDate.getMonth() + 1}`;
-        monthsToLoad.add(monthKey);
-        tempDate.setDate(tempDate.getDate() + 1);
-      }
-      
-      // Load data for each unique month
-      for (const monthKey of monthsToLoad) {
-        const [yearStr, monthStr] = monthKey.split('-');
-        const yearToLoad = parseInt(yearStr);
-        const monthToLoad = parseInt(monthStr);
-        const monthResult = await getPrayerDataForMonth(currentUser.uid, yearToLoad, monthToLoad);
-        allData = { ...allData, ...monthResult };
-      }
-      setMonthData(allData);
+      // Single ranged fetch over the visible calendar window (TTL-cached in analyticsService)
+      const data = await getPrayerDataInRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
+      setMonthData(data || {});
     } catch (error) {
       console.error('Error loading month data:', error);
     }
