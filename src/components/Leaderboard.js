@@ -1376,7 +1376,7 @@ const Leaderboard = () => {
             
             <button
               onClick={() => withdrawFriendRequest(userId)}
-              className="w-full sm:w-auto px-4 py-2 sm:px-3 sm:py-1 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-1"
+              className="w-full sm:w-auto px-4 py-2 sm:px-3 sm:py-1 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center gap-1"
               title="Withdraw friend request"
             >
               <X className="w-3 h-3" />
@@ -1557,7 +1557,7 @@ const Leaderboard = () => {
             <button
               onClick={() => withdrawFriendRequest(user.id)}
               disabled={!online}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${!online ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${!online ? 'bg-amber-200 text-amber-400 cursor-not-allowed' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
               title={!online ? 'Offline: view-only' : 'Withdraw friend request'}
             >
               <X className="w-3 h-3" />

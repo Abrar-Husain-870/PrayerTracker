@@ -7,7 +7,6 @@ import {
   query, 
   where, 
   orderBy,
-  updateDoc,
   deleteField
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -78,20 +77,14 @@ export const savePrayerStatus = async (userId, date, prayer, status) => {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const docRef = doc(db, 'users', userId, 'prayers', dateStr);
 
-    // To ensure the document exists before updating, we can use set with merge
-    // This creates the document if it doesn't exist, without overwriting other fields
-    await setDoc(docRef, { lastUpdated: new Date() }, { merge: true });
-
-    // Now, update the specific prayer field
-    const payload = {};
+    // Single write: set with merge (also supports deleteField) to reduce latency
+    const payload = { lastUpdated: new Date() };
     if (status !== null) {
       payload[prayer] = status;
     } else {
-      // Use deleteField() to remove the prayer key from the document
       payload[prayer] = deleteField();
     }
-
-    await updateDoc(docRef, payload);
+    await setDoc(docRef, payload, { merge: true });
 
     return true;
   } catch (error) {

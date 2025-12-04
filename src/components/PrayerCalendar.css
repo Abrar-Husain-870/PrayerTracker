@@ -1,13 +1,143 @@
+/* Base calendar */
+.react-calendar {
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  font-family: inherit;
+}
+
+/* Navigation */
+.react-calendar__navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.react-calendar__navigation button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  transition: background 0.15s ease;
+}
+.react-calendar__navigation button:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+/* Weekdays header */
+.react-calendar__month-view__weekdays {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: #6b7280; /* gray-500 */
+  margin-bottom: 0.25rem;
+}
+.react-calendar__month-view__weekdays__weekday {
+  padding: 0.35rem 0;
+}
+
+/* Tiles */
+.react-calendar__tile {
+  position: relative;
+  height: 3.2rem;
+  border-radius: 0.6rem;
+  border: 2px solid transparent; /* reserve space to avoid layout shift */
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+.react-calendar__tile:enabled:hover {
+  background: rgba(59,130,246,0.08); /* blue-500/8 */
+}
+.react-calendar__tile:enabled:active {
+  transform: scale(0.98);
+}
+
+/* Neighboring month days dimmed */
+.react-calendar__month-view__days__day--neighboringMonth {
+  opacity: 0.45;
+}
+
+/* Weekends subtle tint */
+.react-calendar__month-view__days__day--weekend {
+  color: #0f172a; /* slate-900 for light */
+}
+
+/* Today highlight (ring) */
+.react-calendar__tile--now {
+  box-shadow: inset 0 0 0 2px rgba(59,130,246,0.55);
+  border-radius: 0.6rem;
+}
+
+/* Active/selected day (non-today: no background, only outline if toggled) */
+.react-calendar__tile--active:not(.tile-today) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Today: always blue background */
+.tile-today {
+  background: #3b82f6 !important; /* blue-500 */
+  color: #ffffff !important;
+}
+.tile-today * { color: inherit; }
+
+/* Clicked (non-today): dotted blue border toggle */
+.tile-outline {
+  border-color: #2563eb !important; /* blue-600 for contrast */
+  border-style: dotted !important;
+  border-width: 3px !important;
+  outline: 2px dotted #93c5fd; /* blue-300 outer ring */
+  outline-offset: 2px;
+}
+
+/* Never outline today tile */
+.tile-today.tile-outline {
+  outline: none !important;
+  border-color: transparent !important;
+}
+
+/* Dark mode tweaks (inherit if using dark class) */
+.dark .react-calendar__navigation button:hover {
+  background: rgba(255,255,255,0.06);
+}
+.dark .react-calendar__month-view__weekdays {
+  color: #9ca3af; /* gray-400 */
+}
+.dark .react-calendar__tile:enabled:hover {
+  background: rgba(59,130,246,0.12);
+}
+.dark .react-calendar__tile--now {
+  box-shadow: inset 0 0 0 2px rgba(96,165,250,0.55);
+}
+
+/* Prayer tile container for custom content */
 .prayer-tile {
   position: relative;
-  transition: background-color 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible; /* allow outlines to be visible */
 }
-
 .prayer-tile:hover {
-  background-color: #fef3c7; /* A light yellow for hover, adjust as needed */
+  background-color: rgba(254, 243, 199, 0.55); /* amber-100/55 */
 }
 
-/* Hide the default number inside the calendar tile */
+/* Hide default day number; custom component shows date/status */
 .prayer-tile abbr {
   visibility: hidden;
+}
+
+/* Subtle backdrop sheen */
+.prayer-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.65), transparent 60%);
+  opacity: 0.6;
+}
+
+/* Remove sheen in dark mode for plain tiles */
+.dark .prayer-tile::after {
+  display: none;
 }

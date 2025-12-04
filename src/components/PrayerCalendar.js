@@ -30,6 +30,10 @@ const PrayerCalendar = () => {
   const monthChangeTimer = useRef(null);
   const [selectedDayData, setSelectedDayData] = useState({});
   const [masjidMode, setMasjidMode] = useState(false);
+  const saveTimersRef = useRef({});
+  const [outlinedDateStr, setOutlinedDateStr] = useState(null);
+
+  const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   // Fetch user's Masjid Mode setting
   useEffect(() => {
@@ -90,34 +94,36 @@ const PrayerCalendar = () => {
     }
   };
 
-  const handlePrayerStatusChange = async (prayer, status) => {
+  const handlePrayerStatusChange = (prayer, rawStatus) => {
     if (!currentUser) return;
-    if (!online) return; // guard writes when offline
+    if (!online) return;
 
-    try {
-      const localDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-      const dateStr = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
-      
-      const statusToSave = (status === '' || status === 'clear') ? null : status;
-      
-      await savePrayerStatus(currentUser.uid, localDate, prayer, statusToSave);
-      
-      const newDayData = { ...selectedDayData };
-      if (statusToSave !== null) {
-        newDayData[prayer] = statusToSave;
-      } else {
-        delete newDayData[prayer];
-      }
-      setSelectedDayData(newDayData);
-      
-      setMonthData(prevData => ({
-        ...prevData,
-        [dateStr]: newDayData
-      }));
+    // Normalize 'clear' to null for deletion
+    const status = rawStatus === 'clear' ? null : rawStatus;
 
-    } catch (error) {
-      console.error('Error updating prayer status:', error);
+    // Build updated day data
+    const updatedDayData = { ...selectedDayData };
+    if (status !== null) {
+      updatedDayData[prayer] = status;
+    } else {
+      delete updatedDayData[prayer];
     }
+
+    // Optimistic UI update
+    setSelectedDayData(updatedDayData);
+    const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+    setMonthData(prevData => ({
+      ...prevData,
+      [dateStr]: updatedDayData
+    }));
+
+    // Debounced save per date key
+    if (saveTimersRef.current[dateStr]) clearTimeout(saveTimersRef.current[dateStr]);
+    saveTimersRef.current[dateStr] = setTimeout(() => {
+      savePrayerStatus(currentUser.uid, selectedDate, prayer, status).catch((e) => {
+        console.error('Error updating prayer status:', e);
+      });
+    }, 200);
   };
 
   const getPrayerIcon = (status) => {
@@ -175,11 +181,33 @@ const PrayerCalendar = () => {
       <div className="p-2 sm:p-4 glass-card">
         <Calendar
           onChange={setSelectedDate}
+          onClickDay={(date) => {
+            const today = new Date();
+            const clickedStr = toDateStr(date);
+            const isToday = toDateStr(today) === clickedStr;
+            if (isToday) {
+              // Clear any existing outline when clicking today
+              setOutlinedDateStr(null);
+              return;
+            }
+            setOutlinedDateStr((prev) => (prev === clickedStr ? null : clickedStr));
+          }}
           onActiveStartDateChange={({ activeStartDate }) => setCurrentMonth(activeStartDate)}
           value={selectedDate}
           tileContent={tileContent}
           className="w-full border-none"
-          tileClassName={({ date, view }) => view === 'month' ? 'prayer-tile' : null}
+          tileClassName={({ date, view }) => {
+            if (view !== 'month') return null;
+            const cls = ['prayer-tile'];
+            const today = new Date();
+            const dateStr = toDateStr(date);
+            if (toDateStr(today) === dateStr) {
+              cls.push('tile-today');
+            } else if (outlinedDateStr === dateStr) {
+              cls.push('tile-outline');
+            }
+            return cls.join(' ');
+          }}
           navigationLabel={({ date }) => (
             <span className="font-semibold text-gray-800">
               {date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
