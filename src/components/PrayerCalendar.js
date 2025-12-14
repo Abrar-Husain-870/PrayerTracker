@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Calendar from 'react-calendar';
 import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query as fsQuery, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { 
   PRAYER_TYPES, 
@@ -12,10 +12,11 @@ import {
   SURAH_STATUS,
   SURAH_COLORS,
   savePrayerStatus,
+  getPrayerStatusForDate,
   calculateDayScore,
   isFriday
 } from '../services/prayerService';
-import { getPrayerDataInRange } from '../services/analyticsService';
+import { getPrayerDataInRangeFresh, invalidatePrayerRangeCache } from '../services/analyticsService';
 import PrayerStatusTile from './PrayerStatusTile'; // Import the new component
 import 'react-calendar/dist/Calendar.css';
 import './PrayerCalendar.css'; // Import custom styles
@@ -34,6 +35,8 @@ const PrayerCalendar = () => {
   const [outlinedDateStr, setOutlinedDateStr] = useState(null);
 
   const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const cacheKeyForRange = (uid, start, end) => `pcache_${uid}_${toDateStr(start)}_${toDateStr(end)}`;
+  const snapshotActiveRef = useRef(false);
 
   // Fetch user's Masjid Mode setting
   useEffect(() => {
@@ -86,13 +89,75 @@ const PrayerCalendar = () => {
       const endOfCalendarView = new Date(lastDayOfMonth);
       endOfCalendarView.setDate(endOfCalendarView.getDate() + (6 - lastDayOfMonth.getDay()));
 
-      // Single ranged fetch over the visible calendar window (TTL-cached in analyticsService)
-      const data = await getPrayerDataInRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
-      setMonthData(data || {});
+      // 1) Hydrate immediately from cache for this range (if available)
+      try {
+        const cacheKey = cacheKeyForRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.data) setMonthData(parsed.data);
+        }
+      } catch {}
+
+      // Single ranged fetch over the visible calendar window (fresh to avoid stale in-memory cache)
+      // If a real-time snapshot is active, skip setting from fetch to avoid stale overwrite
+      let fetchedData;
+      if (!snapshotActiveRef.current) {
+        fetchedData = await getPrayerDataInRangeFresh(currentUser.uid, startOfCalendarView, endOfCalendarView);
+        setMonthData(fetchedData || {});
+      }
+
+      // 2) Write-through cache for this range (only if we actually fetched)
+      if (fetchedData) {
+        try {
+          const cacheKey = cacheKeyForRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
+          localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: fetchedData }));
+        } catch {}
+      }
     } catch (error) {
       console.error('Error loading month data:', error);
     }
   };
+
+  // Real-time listener for visible range to hydrate instantly from Firestore local cache
+  useEffect(() => {
+    if (!currentUser) return;
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const startOfCalendarView = new Date(firstDayOfMonth);
+    startOfCalendarView.setDate(startOfCalendarView.getDate() - firstDayOfMonth.getDay());
+    const endOfCalendarView = new Date(lastDayOfMonth);
+    endOfCalendarView.setDate(endOfCalendarView.getDate() + (6 - lastDayOfMonth.getDay()));
+
+    const startStr = toDateStr(startOfCalendarView);
+    const endStr = toDateStr(endOfCalendarView);
+    const prayersRef = collection(db, 'users', currentUser.uid, 'prayers');
+    const q = fsQuery(
+      prayersRef,
+      where('__name__', '>=', startStr),
+      where('__name__', '<=', endStr),
+      orderBy('__name__')
+    );
+    const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+      snapshotActiveRef.current = true;
+      const data = {};
+      snap.forEach(d => {
+        data[d.id] = d.data();
+      });
+      setMonthData(data);
+      // keep cache in sync
+      try {
+        const cacheKey = cacheKeyForRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data }));
+      } catch {}
+    });
+    return () => {
+      snapshotActiveRef.current = false;
+      unsub();
+    };
+  }, [currentUser, currentMonth]);
 
   const handlePrayerStatusChange = (prayer, rawStatus) => {
     if (!currentUser) return;
@@ -119,12 +184,55 @@ const PrayerCalendar = () => {
 
     // Debounced save per date key
     if (saveTimersRef.current[dateStr]) clearTimeout(saveTimersRef.current[dateStr]);
-    saveTimersRef.current[dateStr] = setTimeout(() => {
-      savePrayerStatus(currentUser.uid, selectedDate, prayer, status).catch((e) => {
+    saveTimersRef.current[dateStr] = setTimeout(async () => {
+      try {
+        await savePrayerStatus(currentUser.uid, selectedDate, prayer, status);
+        // Invalidate cached ranges for this user to avoid stale reads on navigation
+        invalidatePrayerRangeCache(currentUser.uid);
+        // Re-fetch this date to ensure monthData reflects persisted write (fixes navigation loss)
+        const refreshed = await getPrayerStatusForDate(currentUser.uid, selectedDate);
+        setMonthData(prev => ({ ...prev, [dateStr]: refreshed || {} }));
+        setSelectedDayData(refreshed || {});
+
+        // Update cache for current visible range with the refreshed day
+        try {
+          const year = currentMonth.getFullYear();
+          const month = currentMonth.getMonth();
+          const firstDayOfMonth = new Date(year, month, 1);
+          const lastDayOfMonth = new Date(year, month + 1, 0);
+          const startOfCalendarView = new Date(firstDayOfMonth);
+          startOfCalendarView.setDate(startOfCalendarView.getDate() - firstDayOfMonth.getDay());
+          const endOfCalendarView = new Date(lastDayOfMonth);
+          endOfCalendarView.setDate(endOfCalendarView.getDate() + (6 - lastDayOfMonth.getDay()));
+          const cacheKey = cacheKeyForRange(currentUser.uid, startOfCalendarView, endOfCalendarView);
+          const existing = localStorage.getItem(cacheKey);
+          const base = existing ? JSON.parse(existing).data || {} : {};
+          const merged = { ...base, [dateStr]: refreshed || {} };
+          localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: merged }));
+        } catch {}
+      } catch (e) {
         console.error('Error updating prayer status:', e);
-      });
+      }
     }, 200);
   };
+
+  // Refresh monthData when the page regains focus/visibility (fixes cross-route sync)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && currentUser) {
+        loadMonthData();
+      }
+    };
+    const handleFocus = () => {
+      if (currentUser) loadMonthData();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [currentUser]);
 
   const getPrayerIcon = (status) => {
     switch (status) {

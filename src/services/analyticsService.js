@@ -69,6 +69,53 @@ export const getPrayerDataInRange = async (userId, startDate, endDate) => {
   }
 };
 
+// Fresh fetch that bypasses in-memory cache (used by Calendar right after writes)
+export const getPrayerDataInRangeFresh = async (userId, startDate, endDate) => {
+  // Mirrors getPrayerDataInRange, but does not return cached value; it still updates the cache.
+  try {
+    const formatLocalDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const startDateStr = formatLocalDate(startDate);
+    const endDateStr = formatLocalDate(endDate);
+    const cacheKey = _key('getPrayerDataInRange', { userId, startDateStr, endDateStr });
+
+    const prayersRef = collection(db, 'users', userId, 'prayers');
+    const q = query(
+      prayersRef,
+      where('__name__', '>=', startDateStr),
+      where('__name__', '<=', endDateStr),
+      orderBy('__name__')
+    );
+    const querySnapshot = await getDocs(q);
+    const data = {};
+    querySnapshot.forEach((doc) => {
+      data[doc.id] = doc.data();
+    });
+    _set(cacheKey, data);
+    return data;
+  } catch (error) {
+    console.error('Error getting (fresh) prayer data in range:', error);
+    throw error;
+  }
+};
+
+// Invalidate in-memory cache entries for a user's prayer range (best-effort)
+export const invalidatePrayerRangeCache = (userId) => {
+  try {
+    for (const k of _cache.keys()) {
+      if (typeof k === 'string' && k.startsWith('getPrayerDataInRange:') && k.includes(`"userId":"${userId}"`)) {
+        _cache.delete(k);
+      }
+    }
+  } catch (e) {
+    console.warn('Cache invalidate failed:', e);
+  }
+};
+
 // Build per-day trend series (only complete days are included)
 export const getDailyTrend = async (userId, startDate, endDate, masjidMode = false) => {
   const cacheKey = _key('getDailyTrend', {

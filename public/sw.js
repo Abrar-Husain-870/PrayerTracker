@@ -1,5 +1,5 @@
 // Dynamic cache version - this will be updated automatically on each build
-const CACHE_VERSION = 'v2025-12-04-1738'; // Will be replaced by build process
+const CACHE_VERSION = 'v2025-12-14-1105'; // Will be replaced by build process
 const STATIC_CACHE = `namaaz-tracker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `namaaz-tracker-dynamic-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `namaaz-tracker-runtime-${CACHE_VERSION}`;
@@ -7,6 +7,7 @@ const RUNTIME_CACHE = `namaaz-tracker-runtime-${CACHE_VERSION}`;
 // Core files to precache
 const PRECACHE_URLS = [
   '/',
+  '/index.html',
   '/manifest.json',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png'
@@ -59,9 +60,12 @@ async function handleFetch(request) {
   const url = new URL(request.url);
   
   try {
-    // HTML files: Network first, cache fallback
+    // HTML files (app shell): Prefer cached app shell with network refresh
     if (request.mode === 'navigate' || request.destination === 'document') {
-      return await networkFirst(request, STATIC_CACHE);
+      const cached = await caches.match('/') || await caches.match('/index.html');
+      const fetchPromise = networkFirst(request, STATIC_CACHE).catch(() => cached);
+      // Serve cached immediately if available to avoid black screen, then update in background
+      return cached || fetchPromise;
     }
     
     // Static assets (JS, CSS with hash): Cache first
@@ -92,7 +96,7 @@ async function handleFetch(request) {
     
     // Fallback for navigation requests
     if (request.mode === 'navigate') {
-      const cachedResponse = await caches.match('/');
+      const cachedResponse = (await caches.match('/')) || (await caches.match('/index.html'));
       return cachedResponse || new Response('Offline', { status: 503 });
     }
     
