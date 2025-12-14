@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Calendar from 'react-calendar';
 import { ChevronLeft, ChevronRight, Church, Home, Clock, X, Book, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,8 +34,8 @@ const PrayerCalendar = () => {
   const saveTimersRef = useRef({});
   const [outlinedDateStr, setOutlinedDateStr] = useState(null);
 
-  const toDateStr = useCallback((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, []);
-  const cacheKeyForRange = useCallback((uid, start, end) => `pcache_${uid}_${toDateStr(start)}_${toDateStr(end)}`, [toDateStr]);
+  const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const cacheKeyForRange = (uid, start, end) => `pcache_${uid}_${toDateStr(start)}_${toDateStr(end)}`;
   const snapshotActiveRef = useRef(false);
 
   // Fetch user's Masjid Mode setting
@@ -157,7 +157,7 @@ const PrayerCalendar = () => {
       snapshotActiveRef.current = false;
       unsub();
     };
-  }, [currentUser, currentMonth]);
+  }, [currentUser, currentMonth, toDateStr, cacheKeyForRange]);
 
   const handlePrayerStatusChange = (prayer, rawStatus) => {
     if (!currentUser) return;
@@ -232,7 +232,7 @@ const PrayerCalendar = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser]);
+  }, [currentUser, loadMonthData]);
 
   const getPrayerIcon = (status) => {
     switch (status) {
